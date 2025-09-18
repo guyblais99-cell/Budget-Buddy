@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <link rel="icon" type="image/png" href="/bb.png">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Budget Buddy</title>
@@ -246,7 +245,7 @@
             onValue(dbRef, (snapshot) => { const data = snapshot.val(); if (data) { state = data; history = state.history ? Object.values(state.history).sort((a,b) => new Date(b.monthYear).getTime() - new Date(a.monthYear).getTime()) : []; checkForNewMonth(); render(); selectors.onboardingModal.style.display = 'none'; selectors.appContent.style.display = 'block'; } });
             localStorage.setItem('lastBudgetId', budgetId);
         }
-        function checkForNewMonth() { const currentMonthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' }); if (state.monthYear && state.monthYear !== currentMonthYear) { alert(`Welcome to a new month! Your previous month's data for "${state.accountName}" has been archived.`); const oldStateForHistory = { ...state }; delete oldStateForHistory.history; const historyRef = push(ref(db, `budgets/${currentBudgetId}/history`)); set(historyRef, oldStateForHistory); const newBudgets = state.budgetedItems ? Object.entries(state.budgetedItems).reduce((acc, [key, category]) => { const totalSpent = (category.expenses ? Object.values(category.expenses) : []).reduce((sum, exp) => sum + exp.amount, 0); const unspent = category.limit - totalSpent; const newLimit = unspent > 0 ? category.limit + unspent : category.limit; acc[key] = { name: category.name, limit: newLimit, expenses: {}, collapsed: false, isEditing: false }; return acc; }, {}) : {}; const newMonthData = { ...state, monthYear: currentMonthYear, budgetedItems: newBudgets }; set(dbRef, newMonthData); } }
+        function checkForNewMonth() { const currentMonthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' }); if (state.monthYear && new Date(currentMonthYear) > new Date(state.monthYear)) { alert(`Welcome to a new month! Your previous month's data for "${state.accountName}" has been archived.`); const oldStateForHistory = { ...state }; delete oldStateForHistory.history; const historyRef = push(ref(db, `budgets/${currentBudgetId}/history`)); set(historyRef, oldStateForHistory); const newBudgets = state.budgetedItems ? Object.entries(state.budgetedItems).reduce((acc, [key, category]) => { const totalSpent = (category.expenses ? Object.values(category.expenses) : []).reduce((sum, exp) => sum + exp.amount, 0); const unspent = category.limit - totalSpent; const newLimit = unspent > 0 ? category.limit + unspent : category.limit; acc[key] = { name: category.name, limit: newLimit, expenses: {}, collapsed: false, isEditing: false, order: category.order }; return acc; }, {}) : {}; const newMonthData = { ...state, monthYear: currentMonthYear, budgetedItems: newBudgets }; set(dbRef, newMonthData); } }
         function showConfirm(message) { return new Promise(resolve => { selectors.confirmMsg.textContent = message; selectors.confirmModal.style.display = 'flex'; const onOk = () => { selectors.confirmModal.style.display = 'none'; cleanup(); resolve(true); }; const onCancel = () => { selectors.confirmModal.style.display = 'none'; cleanup(); resolve(false); }; const cleanup = () => { selectors.confirmOkBtn.removeEventListener('click', onOk); selectors.confirmCancelBtn.removeEventListener('click', onCancel); }; selectors.confirmOkBtn.addEventListener('click', onOk); selectors.confirmCancelBtn.addEventListener('click', onCancel); }); }
         
         const toArray = (obj) => obj ? Object.values(obj) : [];
@@ -456,5 +455,4 @@
         if (lastBudgetId) { connectToBudget(lastBudgetId); }
     </script>
 </body>
-
 </html>
