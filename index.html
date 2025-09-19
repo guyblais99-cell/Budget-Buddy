@@ -8,6 +8,11 @@
     <style>
         :root {
             --primary-bg: #f4f7f9; --secondary-bg: #ffffff; --text-color: #333; --accent-color: #4a90e2; --accent-hover: #357abd; --income-color: #2ecc71; --expense-color: #e74c3c; --border-color: #e0e0e0; --shadow: 0 4px 8px rgba(0,0,0,0.1);
+            /* Challenge Theme Colors */
+            --challenge-gold: #FFD700;
+            --challenge-dark-gold: #D4AF37;
+            --challenge-bg: #FFFBEA;
+            --challenge-text: #4a3f00;
         }
         * { box-sizing: border-box; }
 
@@ -15,7 +20,7 @@
         .container { 
             max-width: 800px; margin: 0 auto; background-color: var(--secondary-bg); 
             border-radius: 10px; box-shadow: var(--shadow); padding: 20px;
-            position: relative; /* For positioning elements */
+            position: relative;
         }
         #app-logo {
             position: absolute;
@@ -84,50 +89,49 @@
         .expense-log .amount { font-weight: 500; margin-right: 5px; }
         .expense-log .note { color: #777; font-style: italic; margin-left: 5px; flex-grow: 1; word-break: break-all; }
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        #confirm-modal, #prompt-modal { z-index: 1010; }
         .modal-content { background-color: white; padding: 25px; border-radius: 10px; width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto; }
-        #confirm-modal .modal-content, #onboarding-modal .modal-content, #accounts-modal .modal-content { max-width: 400px; text-align: center; }
+        #confirm-modal .modal-content, #onboarding-modal .modal-content, #accounts-modal .modal-content, #prompt-modal .modal-content { max-width: 400px; text-align: center; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px; }
         .modal-header h2 { margin: 0; }
         .modal-header .close-btn { font-size: 1.8em; cursor: pointer; background: none; border: none; padding: 0 10px; color: #333; }
         .chart-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
         .confirm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-        #onboarding-modal { display: flex; } /* Show onboarding by default */
-        .app-content { display: none; } /* Hide app content by default */
+        #onboarding-modal { display: flex; }
+        .app-content { display: none; }
         
-        /* New styles for reordering */
-        .reorder-controls {
-            display: none; /* Hidden by default */
-            align-items: center;
-            margin-right: 10px; /* Spacing between arrows and name */
-            gap: 5px;
-        }
-        .reordering-active .reorder-controls {
-            display: inline-flex; /* Use inline-flex to appear next to the name */
-        }
-        .move-btn {
-            background: none;
-            border: 1px solid #ccc;
-            border-radius: 50%;
-            width: 28px;
-            height: 28px;
-            cursor: pointer;
-            font-size: 1em;
-            padding: 0;
-            line-height: 26px; /* Center the arrow */
-            color: var(--text-color);
-        }
-        .move-btn:hover {
-            background-color: #f0f0f0;
-        }
-        .move-btn:disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-        }
-        /* Hide regular controls while reordering */
-        .reordering-active .budget-category-header .edit-btn,
-        .reordering-active .budget-category-header .delete-btn {
-            display: none;
-        }
+        .reorder-controls { display: none; align-items: center; margin-right: 10px; gap: 5px; }
+        .reordering-active .reorder-controls { display: inline-flex; }
+        .move-btn { background: none; border: 1px solid #ccc; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; font-size: 1em; padding: 0; line-height: 26px; color: var(--text-color); }
+        .move-btn:hover { background-color: #f0f0f0; }
+        .move-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .reordering-active .budget-category-header .edit-btn, .reordering-active .budget-category-header .delete-btn { display: none; }
+
+        #challenge-center-btn { padding: 12px 20px; font-size: 1.1em; font-weight: 600; background-color: var(--challenge-dark-gold); border: 1px solid var(--challenge-gold); line-height: 1.4; }
+        #challenge-center-btn:hover { background-color: var(--challenge-gold); color: var(--challenge-text); }
+        #challenge-modal .modal-content { background-color: var(--challenge-bg); color: var(--challenge-text); border: 2px solid var(--challenge-dark-gold); }
+        #challenge-modal .modal-header { background: linear-gradient(135deg, var(--challenge-gold), var(--challenge-dark-gold)); color: var(--challenge-text); padding: 15px 25px; margin: -25px -25px 20px -25px; border-top-left-radius: 8px; border-top-right-radius: 8px; border-bottom: 2px solid var(--challenge-dark-gold); position: sticky; top: -25px; z-index: 10; }
+        #challenge-modal .modal-header .close-btn { color: var(--challenge-text); }
+        #challenge-modal .challenge-section h3 { border-bottom: 1px solid var(--challenge-dark-gold); color: var(--challenge-dark-gold); padding-bottom: 8px; margin-bottom: 15px; }
+        .challenge-item { background-color: #fff; border: 1px solid var(--border-color); border-left: 5px solid var(--challenge-dark-gold); border-radius: 5px; padding: 10px; margin-bottom: 10px; transition: background-color 0.3s, border-color 0.3s; }
+        .challenge-item.completed { border-left-color: var(--income-color) !important; background-color: #e8f8ef !important; }
+        #review-rewards-list .challenge-item.completed { background-color: var(--challenge-bg); border-left-color: var(--challenge-dark-gold); }
+        #review-rewards-list .challenge-item.completed h4, #trophy-case-list .challenge-item.completed h4 { color: var(--challenge-text); }
+        .challenge-item.failed { border-left-color: var(--expense-color) !important; background-color: #fbe9e7 !important; }
+        #active-challenges-list .challenge-item.active-challenge-highlight { background-color: var(--challenge-dark-gold); border-color: var(--challenge-gold); color: white; }
+        #active-challenges-list .challenge-item.active-challenge-highlight h4, #active-challenges-list .challenge-item.active-challenge-highlight p, #active-challenges-list .challenge-item.active-challenge-highlight .challenge-item-footer { color: white; }
+        .challenge-item h4 { margin: 0 0 5px 0; color: var(--text-color); }
+        .challenge-item p { margin: 0 0 10px 0; font-size: 0.9em; }
+        .challenge-item-footer { display: flex; justify-content: space-between; align-items: center; font-size: 0.85em; color: #555; }
+        #prompt-content select, #prompt-content input { width: 100%; padding: 10px; margin-top: 10px; border: 1px solid var(--border-color); border-radius: 5px; }
+        .btn-gold { background-color: var(--challenge-dark-gold); }
+        .btn-gold:hover { background-color: var(--challenge-gold); color: var(--challenge-text); }
+        .btn-red { background-color: var(--expense-color); }
+        .btn-red:hover { background-color: #c0392b; }
+        .category-challenge-badge { cursor: pointer; margin-right: 8px; filter: grayscale(0.3); transition: filter 0.2s; }
+        .category-challenge-badge:hover { filter: grayscale(0); }
+        .modal-overlay.challenge-alert .modal-content { background-color: var(--challenge-bg); color: var(--challenge-text); border: 2px solid var(--challenge-dark-gold); }
+        .setting-toggle { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; }
         
         @media (max-width: 600px) { 
             .chart-container { grid-template-columns: 1fr; } 
@@ -142,10 +146,17 @@
         <button id="manage-accounts-btn" class="control-btn">Settings & Share</button>
         <header>
             <h1>Budget Buddy</h1>
-            <h2 id="current-account-name"></h2>
+            <div>
+                <h2 id="current-account-name" style="display: inline-block; margin: 10px 0 0 0;"></h2>
+            </div>
             <p id="current-month" style="margin-top: 10px;"></p>
         </header>
-        <button id="review-btn" style="width: 100%; margin-bottom: 20px;">📊 Monthly Review</button>
+        <button id="review-btn" style="width: 100%; margin-bottom: 10px;">📊 Monthly Review</button>
+        <button id="challenge-center-btn" style="width: 100%; margin-bottom: 20px;">
+            🏆 Challenge Center
+            <br>
+            <span id="active-challenge-counter" style="display: none; font-size: 0.8em; font-weight: normal;"></span>
+        </button>
         
         <div class="section" id="income-expenses-section">
             <div class="section-header"><h3>💰 Income & Fixed Expenses</h3><div class="toggle-icon">▼</div></div>
@@ -156,46 +167,76 @@
             </div>
         </div>
 
-        <div class="section">
-            <div class="summary-display budget-section-summary"><h2>Remaining to Spend</h2><p id="remaining-to-spend">$0.00</p></div>
-            
-            <div class="section" id="allocation-section" style="padding: 15px; border-style: dashed; margin-bottom: 20px;">
-                <div class="section-header" style="padding-bottom:10px; border-bottom: 1px solid var(--border-color); margin-bottom:10px;">
-                    <h3>📊 Budget Allocation</h3>
-                    <div class="toggle-icon">▼</div>
-                </div>
-                <div class="section-content">
-                    <div style="display: flex; justify-content: space-between; font-size: 0.9em; margin-bottom: 8px;">
-                        <span><strong>Total to Budget:</strong> <span id="total-to-budget">$0.00</span></span>
-                        <span><strong>Allocated:</strong> <span id="allocated-in-budgets">$0.00</span></span>
-                    </div>
-                    <div class="progress-bar" style="height: 12px; margin-top: 5px;">
-                        <div id="allocation-progress-bar" class="progress-bar-inner"></div>
-                    </div>
-                    <div style="text-align: right; font-weight: bold; margin-top: 8px;">
-                        Remaining to Allocate: <span id="remaining-to-allocate">$0.00</span>
-                    </div>
-                </div>
-            </div>
-
+        <div class="summary-display budget-section-summary"><h2>Remaining to Spend</h2><p id="remaining-to-spend">$0.00</p></div>
+        
+        <div class="section" id="budget-spending-section">
             <div class="section-header">
                 <h3>🛒 Budgeted Spending</h3>
-                <div class="category-controls">
-                    <button id="reorder-toggle-btn" class="control-btn">Reorder</button>
-                    <button id="expand-all-btn" class="control-btn">Expand All</button>
-                    <button id="collapse-all-btn" class="control-btn">Collapse All</button>
-                </div>
+                <div class="category-controls"><button id="reorder-toggle-btn" class="control-btn">Reorder</button><button id="expand-all-btn" class="control-btn">Expand All</button><button id="collapse-all-btn" class="control-btn">Collapse All</button></div>
             </div>
             <div class="section-content" id="budget-categories-list"></div>
             <button class="add-category-btn" id="add-category-btn">+ New Budget Category</button>
             <div class="hidden-form" id="new-category-form"><div class="input-group"><input type="text" id="category-name-input" placeholder="Category Name"><input type="number" id="category-limit-input" placeholder="Budget Limit" min="0" step="0.01"><button id="save-category-btn">Save</button></div></div>
         </div>
+
+        <div class="section" id="allocation-section" style="padding: 15px; border-style: dashed;">
+            <div class="section-header" style="padding-bottom:10px; border-bottom: 1px solid var(--border-color); margin-bottom:10px;">
+                <h3>📊 Allocation Center</h3><div class="toggle-icon">▼</div>
+            </div>
+            <div class="section-content">
+                <div style="display: flex; justify-content: space-between; font-size: 0.9em; margin-bottom: 8px;"><span><strong>Available to Allocate:</strong> <span id="total-to-budget">$0.00</span></span></div>
+                <div style="font-size: 0.9em; margin-bottom: 8px; color: #555;">- Allocated to Budgets: <span id="allocated-in-budgets">$0.00</span></div>
+                <div style="font-size: 0.9em; margin-bottom: 8px; color: #555;">- Allocated to Savings: <span id="allocated-to-savings">$0.00</span></div>
+                <div class="progress-bar" style="height: 12px; margin-top: 5px;"><div id="allocation-progress-bar" class="progress-bar-inner"></div></div>
+                <div style="text-align: right; font-weight: bold; margin-top: 8px;">Remaining to Allocate: <span id="remaining-to-allocate">$0.00</span></div>
+            </div>
+        </div>
+        
+        <div class="section" id="savings-section">
+             <div class="section-header"><h3>🏦 Savings Goals</h3></div>
+            <div class="section-content" id="savings-goals-list"></div>
+            <button class="add-category-btn" id="add-savings-goal-btn">+ New Savings Goal</button>
+            <div class="hidden-form" id="new-savings-goal-form"><div class="input-group"><input type="text" id="savings-goal-name-input" placeholder="Goal Name (e.g., Vacation)"><input type="number" id="savings-goal-amount-input" placeholder="Goal Amount" min="0" step="0.01"><button id="save-savings-goal-btn">Save Goal</button></div></div>
+        </div>
     </div>
 
     <div class="modal-overlay" id="onboarding-modal"><div class="modal-content"><div class="modal-header"><h2>Welcome to Budget Buddy</h2></div><p>Create a new budget to share, or join one using an ID from a friend.</p><button id="create-new-budget-btn" style="width: 100%; margin-bottom: 15px;">Create a New Shared Budget</button><hr><p style="margin-top: 15px;"><strong>Or Join Existing Budget</strong></p><div class="input-group"><input type="text" id="join-budget-id-input" placeholder="Enter Sharable ID"><button id="join-budget-btn">Join</button></div></div></div>
-    <div class="modal-overlay" id="review-modal"><div class="modal-content"><div class="modal-header"><h2>Monthly Review</h2><button class="close-btn" id="close-review-modal-btn">&times;</button></div><div id="review-content"><div id="review-controls" style="width: 100%;"><label for="month-select">Select Month:</label><select id="month-select" style="padding: 8px; width: 100%;"></select></div><div id="no-history-msg" style="display: none; text-align: center; margin-top: 20px;"><p>No historical data for this budget yet.</p><button id="no-history-close-btn" style="margin-top: 15px;">Go Back</button></div><div class="chart-container" id="charts-area"><div><h3>Cash Flow</h3><canvas id="cashflow-chart"></canvas></div><div><h3>Spending Breakdown</h3><canvas id="spending-chart"></canvas></div></div></div></div></div>
-    <div class="modal-overlay" id="accounts-modal"><div class="modal-content"><div class="modal-header"><h2>Budget Settings & Sharing</h2><button class="close-btn" id="close-accounts-modal-btn">&times;</button></div><div id="accounts-content"><h3>Edit Budget Name</h3><div class="input-group"><input type="text" id="edit-account-name-input" placeholder="Budget Name"><button id="save-account-name-btn">Save</button></div><hr><h3>Your Sharable Budget ID</h3><p style="font-size: 0.9em; color: #555;">Give this ID to others so they can join and edit this budget in real-time.</p><div class="input-group"><input type="text" id="sharable-id-display" readonly style="background-color: #f0f0f0; font-weight: bold;"><button id="copy-id-btn">Copy</button></div><hr><button id="leave-budget-btn" style="width:100%; background-color: var(--expense-color);">Leave Budget</button></div></div></div>
-    <div class="modal-overlay" id="confirm-modal"><div class="modal-content"><p id="confirm-msg"></p><div class="confirm-actions"><button id="confirm-cancel-btn" style="background-color: #777;">Cancel</button><button id="confirm-ok-btn" style="background-color: var(--expense-color);">Confirm</button></div></div></div>
+    <div class="modal-overlay" id="review-modal"><div class="modal-content"><div class="modal-header"><h2>Monthly Review</h2><button class="close-btn" id="close-review-modal-btn">&times;</button></div><div id="review-content"><div id="review-controls" style="width: 100%;"><label for="month-select">Select Month:</label><select id="month-select" style="padding: 8px; width: 100%;"></select></div><div id="no-history-msg" style="display: none; text-align: center; margin-top: 20px;"><p>No historical data for this budget yet.</p><button id="no-history-close-btn" style="margin-top: 15px;">Go Back</button></div><div class="chart-container" id="charts-area"><div><h3>Cash Flow</h3><canvas id="cashflow-chart"></canvas></div><div><h3>Spending Breakdown</h3><canvas id="spending-chart"></canvas></div></div><div class="section" id="review-rewards-section" style="margin-top: 20px; display: none;"><h3>🏆 Monthly Achievements</h3><div id="review-rewards-list"></div></div></div></div></div>
+    <div class="modal-overlay" id="accounts-modal"><div class="modal-content"><div class="modal-header"><h2>Budget Settings & Sharing</h2><button class="close-btn" id="close-accounts-modal-btn">&times;</button></div><div id="accounts-content"><h3>Edit Budget Name</h3><div class="input-group"><input type="text" id="edit-account-name-input" placeholder="Budget Name"><button id="save-account-name-btn">Save</button></div><hr><h3>Your Sharable Budget ID</h3><p style="font-size: 0.9em; color: #555;">Give this ID to others so they can join and edit this budget in real-time.</p><div class="input-group"><input type="text" id="sharable-id-display" readonly style="background-color: #f0f0f0; font-weight: bold;"><button id="copy-id-btn">Copy</button></div><hr><h3>Features</h3><div class="setting-toggle"><label for="toggle-challenges">Enable Challenge Center</label><input type="checkbox" id="toggle-challenges"></div><hr><button id="leave-budget-btn" style="width:100%; background-color: var(--expense-color);">Leave Budget</button></div></div></div>
+    <div class="modal-overlay" id="confirm-modal"><div class="modal-content"><p id="confirm-msg"></p><div class="confirm-actions"><button id="confirm-cancel-btn" style="background-color: #777;">Cancel</button><button id="confirm-ok-btn">Confirm</button></div></div></div>
+    
+    <div class="modal-overlay" id="challenge-modal">
+        <div class="modal-content">
+            <div class="modal-header"><h2>🏆 Challenge Center</h2><button class="close-btn" id="close-challenge-modal-btn">&times;</button></div>
+            <div id="challenge-content">
+                <div class="challenge-section">
+                    <h3>This Month's Challenges</h3>
+                    <div id="active-challenges-list"></div>
+                </div>
+                <hr style="margin: 25px 0;">
+                <div class="challenge-section">
+                    <h3>Available Challenges</h3>
+                    <div id="available-challenges-list"></div>
+                </div>
+                <hr style="margin: 25px 0;">
+                <div class="challenge-section" id="trophy-case-section">
+                    <h3>🏆 Trophy Case (All-Time)</h3>
+                    <div id="trophy-case-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="prompt-modal">
+        <div class="modal-content">
+            <div class="modal-header"><h2 id="prompt-title"></h2></div>
+            <div id="prompt-content" style="text-align: left;"></div>
+            <div class="confirm-actions">
+                <button id="prompt-cancel-btn" style="background-color: #777;">Cancel</button>
+                <button id="prompt-ok-btn">OK</button>
+            </div>
+        </div>
+    </div>
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -217,11 +258,12 @@
             incomeList: document.getElementById('income-list'), incomeNameInput: document.getElementById('income-name-input'), incomeAmountInput: document.getElementById('income-amount-input'), addIncomeBtn: document.getElementById('add-income-btn'), 
             expenseList: document.getElementById('expense-list'), expenseNameInput: document.getElementById('expense-name-input'), expenseAmountInput: document.getElementById('expense-amount-input'), addExpenseBtn: document.getElementById('add-expense-btn'), 
             budgetCategoriesList: document.getElementById('budget-categories-list'), addCategoryBtn: document.getElementById('add-category-btn'), newCategoryForm: document.getElementById('new-category-form'), categoryNameInput: document.getElementById('category-name-input'), categoryLimitInput: document.getElementById('category-limit-input'), saveCategoryBtn: document.getElementById('save-category-btn'), 
+            savingsGoalsList: document.getElementById('savings-goals-list'), addSavingsGoalBtn: document.getElementById('add-savings-goal-btn'), newSavingsGoalForm: document.getElementById('new-savings-goal-form'), savingsGoalNameInput: document.getElementById('savings-goal-name-input'), savingsGoalAmountInput: document.getElementById('savings-goal-amount-input'), saveSavingsGoalBtn: document.getElementById('save-savings-goal-btn'),
             incomeExpensesSection: document.getElementById('income-expenses-section'),
             allocationSection: document.getElementById('allocation-section'),
             summaryTotalIncome: document.getElementById('summary-total-income'), summaryTotalExpenses: document.getElementById('summary-total-expenses'),
             expandAllBtn: document.getElementById('expand-all-btn'), collapseAllBtn: document.getElementById('collapse-all-btn'),
-            reorderToggleBtn: document.getElementById('reorder-toggle-btn'), // Added selector
+            reorderToggleBtn: document.getElementById('reorder-toggle-btn'),
             reviewBtn: document.getElementById('review-btn'), reviewModal: document.getElementById('review-modal'), closeReviewModalBtn: document.getElementById('close-review-modal-btn'),
             monthSelect: document.getElementById('month-select'), chartsArea: document.getElementById('charts-area'), noHistoryMsg: document.getElementById('no-history-msg'),
             reviewControls: document.getElementById('review-controls'), noHistoryCloseBtn: document.getElementById('no-history-close-btn'),
@@ -231,12 +273,58 @@
             editAccountNameInput: document.getElementById('edit-account-name-input'), saveAccountNameBtn: document.getElementById('save-account-name-btn'),
             confirmModal: document.getElementById('confirm-modal'), confirmMsg: document.getElementById('confirm-msg'), confirmOkBtn: document.getElementById('confirm-ok-btn'), confirmCancelBtn: document.getElementById('confirm-cancel-btn'),
             onboardingModal: document.getElementById('onboarding-modal'), createNewBudgetBtn: document.getElementById('create-new-budget-btn'), joinBudgetBtn: document.getElementById('join-budget-btn'), joinBudgetIdInput: document.getElementById('join-budget-id-input'),
-            totalToBudget: document.getElementById('total-to-budget'), allocatedInBudgets: document.getElementById('allocated-in-budgets'), remainingToAllocate: document.getElementById('remaining-to-allocate'), allocationProgressBar: document.getElementById('allocation-progress-bar'),
+            totalToBudget: document.getElementById('total-to-budget'), allocatedInBudgets: document.getElementById('allocated-in-budgets'), allocatedToSavings: document.getElementById('allocated-to-savings'), remainingToAllocate: document.getElementById('remaining-to-allocate'), allocationProgressBar: document.getElementById('allocation-progress-bar'),
+            challengeCenterBtn: document.getElementById('challenge-center-btn'),
+            challengeModal: document.getElementById('challenge-modal'),
+            closeChallengeModalBtn: document.getElementById('close-challenge-modal-btn'),
+            activeChallengesList: document.getElementById('active-challenges-list'),
+            availableChallengesList: document.getElementById('available-challenges-list'),
+            challengeBtnCounter: document.getElementById('active-challenge-counter'),
+            promptModal: document.getElementById('prompt-modal'),
+            promptTitle: document.getElementById('prompt-title'),
+            promptContent: document.getElementById('prompt-content'),
+            promptOkBtn: document.getElementById('prompt-ok-btn'),
+            promptCancelBtn: document.getElementById('prompt-cancel-btn'),
+            reviewRewardsSection: document.getElementById('review-rewards-section'),
+            reviewRewardsList: document.getElementById('review-rewards-list'),
+            trophyCaseList: document.getElementById('trophy-case-list'),
+            toggleChallenges: document.getElementById('toggle-challenges'),
         };
 
         const currencyFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
         
-        function createNewBudget() { return { accountName: 'My Shared Budget', income: {}, monthlyExpenses: {}, budgetedItems: {}, monthYear: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }), incomeSectionCollapsed: false, allocationSectionCollapsed: false, history: {}, }; }
+        const CHALLENGE_DEFINITIONS = {
+            stayUnderBudget: {
+                title: "Stay Under Budget",
+                description: "Pick a spending category and set a custom spending limit for this month.",
+                requires: 'budgetCategory',
+                prompt: { amount: "Enter your target spending limit for this category:" },
+                badge: '💰'
+            },
+            noSpend: {
+                title: "No-Spend Challenge",
+                description: "Pick a spending category and try not to spend any money in it for a set number of days.",
+                requires: 'budgetCategory',
+                prompt: { days: "For how many days do you want to attempt this challenge?" },
+                badge: '🚫'
+            },
+            goalBooster: {
+                title: "Goal Booster",
+                description: "Pick a savings goal and challenge yourself to contribute a specific amount to it.",
+                requires: 'savingsGoal',
+                prompt: { amount: "What is your contribution goal?" },
+                badge: '🚀'
+            },
+            expenseLogger: {
+                title: "Expense Logger",
+                description: "Build a habit by logging at least one expense every day for a week.",
+                requires: 'none',
+                config: { days: 7 },
+                badge: '✍️'
+            }
+        };
+
+        function createNewBudget() { return { accountName: 'My Shared Budget', income: {}, monthlyExpenses: {}, budgetedItems: {}, monthYear: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }), incomeSectionCollapsed: false, allocationSectionCollapsed: false, history: {}, activeChallenges: {}, allTimeTrophies: {}, challengesEnabled: true }; }
         function startNewBudget() { const newBudgetRef = push(ref(db, 'budgets')); const newBudgetId = newBudgetRef.key; set(newBudgetRef, createNewBudget()); connectToBudget(newBudgetId); }
         async function joinBudget() { const budgetId = selectors.joinBudgetIdInput.value.trim(); if (!budgetId) { alert('Please enter a budget ID.'); return; } const budgetRef = ref(db, `budgets/${budgetId}`); const snapshot = await get(budgetRef); if (snapshot.exists()) { connectToBudget(budgetId); } else { alert('Budget ID not found. Please check the ID and try again.'); } }
         function connectToBudget(budgetId) {
@@ -245,207 +333,508 @@
             onValue(dbRef, (snapshot) => { const data = snapshot.val(); if (data) { state = data; history = state.history ? Object.values(state.history).sort((a,b) => new Date(b.monthYear).getTime() - new Date(a.monthYear).getTime()) : []; checkForNewMonth(); render(); selectors.onboardingModal.style.display = 'none'; selectors.appContent.style.display = 'block'; } });
             localStorage.setItem('lastBudgetId', budgetId);
         }
-        function checkForNewMonth() { const currentMonthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' }); if (state.monthYear && new Date(currentMonthYear) > new Date(state.monthYear)) { alert(`Welcome to a new month! Your previous month's data for "${state.accountName}" has been archived.`); const oldStateForHistory = { ...state }; delete oldStateForHistory.history; const historyRef = push(ref(db, `budgets/${currentBudgetId}/history`)); set(historyRef, oldStateForHistory); const newBudgets = state.budgetedItems ? Object.entries(state.budgetedItems).reduce((acc, [key, category]) => { const totalSpent = (category.expenses ? Object.values(category.expenses) : []).reduce((sum, exp) => sum + exp.amount, 0); const unspent = category.limit - totalSpent; const newLimit = unspent > 0 ? category.limit + unspent : category.limit; acc[key] = { name: category.name, limit: newLimit, expenses: {}, collapsed: false, isEditing: false, order: category.order }; return acc; }, {}) : {}; const newMonthData = { ...state, monthYear: currentMonthYear, budgetedItems: newBudgets }; set(dbRef, newMonthData); } }
-        function showConfirm(message) { return new Promise(resolve => { selectors.confirmMsg.textContent = message; selectors.confirmModal.style.display = 'flex'; const onOk = () => { selectors.confirmModal.style.display = 'none'; cleanup(); resolve(true); }; const onCancel = () => { selectors.confirmModal.style.display = 'none'; cleanup(); resolve(false); }; const cleanup = () => { selectors.confirmOkBtn.removeEventListener('click', onOk); selectors.confirmCancelBtn.removeEventListener('click', onCancel); }; selectors.confirmOkBtn.addEventListener('click', onOk); selectors.confirmCancelBtn.addEventListener('click', onCancel); }); }
+        function checkForNewMonth() { 
+            const currentMonthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' }); 
+            if (state.monthYear && new Date(currentMonthYear) > new Date(state.monthYear)) { 
+                alert(`Welcome to a new month! Your previous month's data for "${state.accountName}" has been archived.`); 
+                
+                const updates = {};
+                const completed = Object.values(state.activeChallenges || {}).filter(c => c.status === 'completed');
+                completed.forEach(c => {
+                    const newTrophyRef = push(ref(db, `budgets/${currentBudgetId}/allTimeTrophies`));
+                    updates[`/allTimeTrophies/${newTrophyRef.key}`] = { ...c, archivedMonth: state.monthYear };
+                });
+                if (Object.keys(updates).length > 0) {
+                    update(dbRef, updates);
+                }
+
+                const oldStateForHistory = { ...state }; 
+                delete oldStateForHistory.history; 
+                const historyRef = push(ref(db, `budgets/${currentBudgetId}/history`)); 
+                set(historyRef, oldStateForHistory); 
+                
+                const newBudgets = state.budgetedItems ? Object.entries(state.budgetedItems).reduce((acc, [key, item]) => { const totalSpent = (item.expenses ? Object.values(item.expenses) : []).reduce((sum, exp) => sum + exp.amount, 0); const unspent = item.limit - totalSpent; const newLimit = item.type === 'savings' ? item.limit : (unspent > 0 ? item.limit + unspent : item.limit); acc[key] = { name: item.name, limit: newLimit, expenses: {}, collapsed: false, isEditing: false, order: item.order, type: item.type }; return acc; }, {}) : {}; 
+                const newMonthData = { ...state, monthYear: currentMonthYear, budgetedItems: newBudgets, activeChallenges: {}, allTimeTrophies: { ...state.allTimeTrophies, ...updates } }; 
+                set(dbRef, newMonthData); 
+            } 
+        }
+        
+        function showChallengeAlert(message) {
+            selectors.confirmModal.classList.add('challenge-alert');
+            selectors.confirmMsg.textContent = message;
+            selectors.confirmCancelBtn.style.display = 'none';
+            selectors.confirmOkBtn.textContent = 'Awesome!';
+            selectors.confirmModal.style.display = 'flex';
+
+            const onOk = () => {
+                selectors.confirmModal.style.display = 'none';
+                selectors.confirmModal.classList.remove('challenge-alert');
+                selectors.confirmCancelBtn.style.display = 'inline-block';
+                selectors.confirmOkBtn.textContent = 'Confirm';
+                selectors.confirmOkBtn.removeEventListener('click', onOk);
+            };
+            
+            selectors.confirmOkBtn.addEventListener('click', onOk);
+        }
+
+        function showConfirm(message) { 
+            return new Promise(resolve => {
+                selectors.confirmOkBtn.textContent = 'Confirm';
+                selectors.confirmMsg.textContent = message; 
+                selectors.confirmModal.style.display = 'flex'; 
+                const onOk = () => { selectors.confirmModal.style.display = 'none'; cleanup(); resolve(true); }; 
+                const onCancel = () => { selectors.confirmModal.style.display = 'none'; cleanup(); resolve(false); }; 
+                const cleanup = () => { selectors.confirmOkBtn.removeEventListener('click', onOk); selectors.confirmCancelBtn.removeEventListener('click', onCancel); }; 
+                selectors.confirmOkBtn.addEventListener('click', onOk); 
+                selectors.confirmCancelBtn.addEventListener('click', onCancel); 
+            }); 
+        }
+        
+        function showPrompt({ title, inputs }) {
+            return new Promise(resolve => {
+                selectors.promptTitle.textContent = title;
+                selectors.promptContent.innerHTML = '';
+
+                inputs.forEach(input => {
+                    let inputHtml = `<label style="display: block; margin-top: 10px; font-weight: 500;">${input.label}</label>`;
+                    if (input.type === 'select') {
+                        inputHtml += `<select id="${input.id}">` + input.options.map(opt => `<option value="${opt.value}">${opt.text}</option>`).join('') + `</select>`;
+                    } else {
+                        inputHtml += `<input type="${input.type}" id="${input.id}" placeholder="${input.placeholder || ''}" min="1">`;
+                    }
+                    selectors.promptContent.innerHTML += inputHtml;
+                });
+
+                selectors.promptModal.style.display = 'flex';
+
+                const onOk = () => {
+                    const results = {};
+                    let isValid = true;
+                    inputs.forEach(input => {
+                        const el = document.getElementById(input.id);
+                        if (el.type === 'number' && (el.value === '' || parseFloat(el.value) <= 0)) {
+                           isValid = false;
+                        }
+                        results[input.id] = el.value;
+                    });
+
+                    if (!isValid) {
+                        alert('Please enter a valid number greater than 0.');
+                        return;
+                    }
+
+                    cleanup();
+                    resolve(results);
+                };
+
+                const onCancel = () => {
+                    cleanup();
+                    resolve(null);
+                };
+
+                const cleanup = () => {
+                    selectors.promptModal.style.display = 'none';
+                    selectors.promptOkBtn.removeEventListener('click', onOk);
+                    selectors.promptCancelBtn.removeEventListener('click', onCancel);
+                };
+                
+                selectors.promptOkBtn.addEventListener('click', onOk);
+                selectors.promptCancelBtn.addEventListener('click', onCancel);
+            });
+        }
         
         const toArray = (obj) => obj ? Object.values(obj) : [];
         const calculateTotalIncome = (data) => toArray(data.income).reduce((sum, item) => sum + item.amount, 0);
         const calculateTotalMonthlyExpenses = (data) => toArray(data.monthlyExpenses).reduce((sum, item) => sum + item.amount, 0);
-        const calculateTotalBudgetedSpending = (data) => toArray(data.budgetedItems).flatMap(cat => toArray(cat.expenses)).reduce((sum, exp) => sum + exp.amount, 0);
         const calculateIncomeAfterBills = (data) => calculateTotalIncome(data) - calculateTotalMonthlyExpenses(data);
-        const calculateTotalAllocated = (data) => toArray(data.budgetedItems).reduce((sum, cat) => sum + cat.limit, 0);
-
-        function getColorForPercentage(percent) {
-            percent = Math.max(0, Math.min(100, percent));
-            const startColor = { r: 46, g: 204, b: 113 };
-            const endColor = { r: 255, g: 193, b: 7 };
-            const r = Math.round(startColor.r + (endColor.r - startColor.r) * (1 - percent / 100));
-            const g = Math.round(startColor.g + (endColor.g - startColor.g) * (1 - percent / 100));
-            const b = Math.round(startColor.b + (endColor.b - startColor.b) * (1 - percent / 100));
-            return `rgb(${r}, ${g}, ${b})`;
-        }
+        const getItemsByType = (data, type) => toArray(data.budgetedItems).filter(item => item.type === type || (type === 'budget' && item.type === undefined));
+        const calculateTotalAllocatedToBudgets = (data) => getItemsByType(data, 'budget').reduce((sum, cat) => sum + cat.limit, 0);
+        const calculateTotalAllocatedToSavings = (data) => getItemsByType(data, 'savings').reduce((sum, cat) => sum + cat.limit, 0);
+        const calculateTotalBudgetedSpending = (data) => getItemsByType(data, 'budget').flatMap(cat => toArray(cat.expenses)).reduce((sum, exp) => sum + exp.amount, 0);
+        const calculateTotalContributions = (data) => getItemsByType(data, 'savings').flatMap(cat => toArray(cat.expenses)).reduce((sum, exp) => sum + exp.amount, 0);
+        const calculateSpentInCategory = (categoryKey) => toArray(state.budgetedItems?.[categoryKey]?.expenses).reduce((sum, exp) => sum + exp.amount, 0);
+        function getColorForPercentage(percent) { percent = Math.max(0, Math.min(100, percent)); const startColor = { r: 46, g: 204, b: 113 }; const midColor = { r: 255, g: 193, b: 7 }; const r = Math.round(startColor.r + (midColor.r - startColor.r) * (1 - percent / 100)); const g = Math.round(startColor.g + (midColor.g - startColor.g) * (1 - percent / 100)); const b = Math.round(startColor.b + (midColor.b - startColor.b) * (1 - percent / 100)); return `rgb(${r}, ${g}, ${b})`; }
 
         function render() {
             if(!state) return;
+
+            const challengesEnabled = state.challengesEnabled !== false;
+            selectors.challengeCenterBtn.style.display = challengesEnabled ? 'block' : 'none';
+
             const incomeAfterBills = calculateIncomeAfterBills(state);
-            selectors.remainingToSpend.textContent = currencyFormatter.format(incomeAfterBills - calculateTotalBudgetedSpending(state));
+            selectors.remainingToSpend.textContent = currencyFormatter.format(incomeAfterBills - calculateTotalBudgetedSpending(state) - calculateTotalContributions(state));
             selectors.summaryTotalIncome.textContent = currencyFormatter.format(calculateTotalIncome(state));
             selectors.summaryTotalExpenses.textContent = currencyFormatter.format(calculateTotalMonthlyExpenses(state));
-            
-            const totalAllocated = calculateTotalAllocated(state);
-            const remainingToAllocate = incomeAfterBills - totalAllocated;
-            const remainingPercent = incomeAfterBills > 0 ? (remainingToAllocate / incomeAfterBills) * 100 : (remainingToAllocate > 0 ? 100 : 0);
-            
+            const totalAllocatedToBudgets = calculateTotalAllocatedToBudgets(state);
+            const totalAllocatedToSavings = calculateTotalAllocatedToSavings(state);
+            const remainingToAllocate = incomeAfterBills - totalAllocatedToBudgets - totalAllocatedToSavings;
+            const allocationPercent = incomeAfterBills > 0 ? (remainingToAllocate / incomeAfterBills) * 100 : (remainingToAllocate > 0 ? 100 : 0);
             selectors.totalToBudget.textContent = currencyFormatter.format(incomeAfterBills);
-            selectors.allocatedInBudgets.textContent = currencyFormatter.format(totalAllocated);
+            selectors.allocatedInBudgets.textContent = currencyFormatter.format(totalAllocatedToBudgets);
+            selectors.allocatedToSavings.textContent = currencyFormatter.format(totalAllocatedToSavings);
             selectors.remainingToAllocate.textContent = currencyFormatter.format(remainingToAllocate);
-            selectors.allocationProgressBar.style.width = `${Math.max(0, remainingPercent)}%`;
-            selectors.allocationProgressBar.style.backgroundColor = getColorForPercentage(remainingPercent);
+            selectors.allocationProgressBar.style.width = `${Math.max(0, allocationPercent)}%`;
+            selectors.allocationProgressBar.style.backgroundColor = getColorForPercentage(allocationPercent);
             if (remainingToAllocate < 0) { selectors.remainingToAllocate.style.color = 'var(--expense-color)'; } else { selectors.remainingToAllocate.style.color = 'var(--text-color)'; }
 
+            if (challengesEnabled) {
+                const activeChallengeCount = Object.values(state.activeChallenges || {}).filter(c => c.status === 'active').length;
+                if (activeChallengeCount > 0) {
+                    selectors.challengeBtnCounter.textContent = `${activeChallengeCount} Active`;
+                    selectors.challengeBtnCounter.style.display = 'block';
+                } else {
+                    selectors.challengeBtnCounter.style.display = 'none';
+                }
+            }
+            
             renderList(state.income, selectors.incomeList, 'income');
             renderList(state.monthlyExpenses, selectors.expenseList, 'expense');
-            renderBudgetCategories();
+            renderCategorizedItems();
+            if (challengesEnabled) {
+                renderChallenges();
+            }
             if (state.incomeSectionCollapsed) selectors.incomeExpensesSection.classList.add('collapsed'); else selectors.incomeExpensesSection.classList.remove('collapsed');
             if (state.allocationSectionCollapsed) selectors.allocationSection.classList.add('collapsed'); else selectors.allocationSection.classList.remove('collapsed');
             renderHeader();
         }
 
-        function renderList(items, element, type) {
-            element.innerHTML = '';
-            if (!items) return;
-            Object.entries(items).forEach(([key, item]) => {
-                let itemHtml = '';
-                if (item.isEditing) {
-                    itemHtml = `
-                        <div class="input-group">
-                            <input type="text" class="edit-item-name-input" value="${item.name}">
-                            <input type="number" class="edit-item-amount-input" value="${item.amount.toFixed(2)}" min="0" step="0.01">
-                            <button class="save-item-btn" data-key="${key}" data-type="${type}">Save</button>
-                            <button class="cancel-item-btn" style="background-color:#777" data-key="${key}" data-type="${type}">Cancel</button>
-                        </div>`;
-                } else {
-                    itemHtml = `
-                        <div class="input-group">
-                            <input type="text" value="${item.name}" readonly>
-                            <input type="number" value="${item.amount.toFixed(2)}" readonly>
-                            <button class="icon-btn edit-btn edit-item-btn" data-key="${key}" data-type="${type}">✏️</button>
-                            <button class="icon-btn delete-btn" data-key="${key}" data-type="${type}">✖</button>
-                        </div>`;
-                }
-                element.innerHTML += itemHtml;
-            });
-        }
+        function renderList(items, element, type) { element.innerHTML = ''; if (!items) return; Object.entries(items).forEach(([key, item]) => { const itemHtml = item.isEditing ? `<div class="input-group"><input type="text" class="edit-item-name-input" value="${item.name}"><input type="number" class="edit-item-amount-input" value="${item.amount.toFixed(2)}" min="0" step="0.01"><button class="save-item-btn" data-key="${key}" data-type="${type}">Save</button><button class="cancel-item-btn" style="background-color:#777" data-key="${key}" data-type="${type}">Cancel</button></div>` : `<div class="input-group"><input type="text" value="${item.name}" readonly><input type="number" value="${item.amount.toFixed(2)}" readonly><button class="icon-btn edit-btn edit-item-btn" data-key="${key}" data-type="${type}">✏️</button><button class="icon-btn delete-btn" data-key="${key}" data-type="${type}">✖</button></div>`; element.innerHTML += itemHtml; }); }
+        function renderCategorizedItems() { 
+            selectors.budgetCategoriesList.innerHTML = ''; 
+            selectors.savingsGoalsList.innerHTML = ''; 
+            if (!state.budgetedItems) return; 
 
-        function renderBudgetCategories() {
-            selectors.budgetCategoriesList.innerHTML = '';
-            if (!state.budgetedItems) return;
-
-            // --- NEW LOGIC: Convert to array, handle missing 'order', and sort ---
-            const updates = {};
-            let sortedCategories = Object.entries(state.budgetedItems).map(([key, cat], index) => {
-                // This handles older categories that don't have an order property yet.
-                if (cat.order === undefined) {
-                    cat.order = index;
-                    updates[`/budgetedItems/${key}/order`] = index;
-                }
-                return [key, cat];
-            });
-
-            // If we found any items without an order, update the database.
-            if (Object.keys(updates).length > 0) {
-                update(dbRef, updates);
+            let challengedCategoryKeys = {};
+            if (state.challengesEnabled !== false) {
+                Object.values(state.activeChallenges || {}).forEach(c => {
+                    if (c.targetCategoryKey && c.status === 'active') {
+                        challengedCategoryKeys[c.targetCategoryKey] = true;
+                    }
+                });
             }
 
-            sortedCategories.sort((a, b) => a[1].order - b[1].order);
-            const isReordering = selectors.budgetCategoriesList.classList.contains('reordering-active');
-            // --- END NEW LOGIC ---
+            const updates = {}; 
+            let sortedItems = Object.entries(state.budgetedItems).map(([key, cat], index) => { if (cat.order === undefined) { cat.order = index; updates[`/budgetedItems/${key}/order`] = index; } return [key, cat]; }); if (Object.keys(updates).length > 0) { update(dbRef, updates); } sortedItems.sort((a, b) => a[1].order - b[1].order); const isReordering = selectors.budgetCategoriesList.classList.contains('reordering-active'); 
+            
+            sortedItems.forEach(([key, item], index) => { 
+                const hasChallenge = challengedCategoryKeys[key];
+                const challengeBadgeHTML = hasChallenge ? `<span class="category-challenge-badge" title="This category has an active challenge!">🏆</span>` : '';
 
-            // Now, loop through the SORTED array
-            sortedCategories.forEach(([key, category], index) => {
-                const categoryDiv = document.createElement('div');
-                if (category.isEditing) {
-                    categoryDiv.className = 'budget-category';
-                    categoryDiv.innerHTML = `<div class="edit-category-form"><p><strong>Edit Category</strong></p><div class="input-group"><input type="text" class="edit-name-input" value="${category.name}"><input type="number" class="edit-limit-input" value="${category.limit.toFixed(2)}" min="0" step="0.01"></div><div style="margin-top: 10px; display: flex; gap: 10px;"><button class="save-edit-btn" data-key="${key}">Save</button><button class="cancel-edit-btn" data-key="${key}" style="background-color: #777;">Cancel</button></div></div>`;
-                } else {
-                    categoryDiv.className = `budget-category ${category.collapsed ? 'collapsed' : ''}`;
-                    const totalSpent = toArray(category.expenses).reduce((sum, exp) => sum + exp.amount, 0);
-                    const remainingPercent = category.limit > 0 ? Math.max(0, 100 * (category.limit - totalSpent) / category.limit) : 100;
-                    const overspentPercent = category.limit > 0 ? Math.max(0, 100 * (totalSpent - category.limit) / category.limit) : 0;
-                    const barColor = getColorForPercentage(remainingPercent);
-                    const expenseLogsHTML = category.expenses ? Object.entries(category.expenses).map(([expKey, exp]) => { if (exp.isEditing) { return `<li class="edit-expense-form"><div class="input-group"><input type="number" class="edit-expense-amount-input" value="${exp.amount.toFixed(2)}"><input type="text" class="edit-expense-note-input" value="${exp.note || ''}"></div><div style="margin-top:5px; display:flex; gap:5px;"><button class="save-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">Save</button><button class="cancel-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}" style="background-color:#777">Cancel</button></div></li>`; } return `<li><span class="amount">${currencyFormatter.format(exp.amount)}</span><span class="note">${exp.note}</span><span class="date-stamp">${exp.date || ''}</span><div style="display:flex; gap:5px;"><button class="icon-btn edit-btn edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">✏️</button><button class="icon-btn delete-btn delete-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">✖</button></div></li>`; }).join('') : '';
-                    
-                    // --- NEW: HTML for reorder controls ---
-                    const reorderControlsHTML = `
-                        <span class="reorder-controls">
-                            <button class="move-btn move-up-btn" data-key="${key}" ${index === 0 ? 'disabled' : ''}>🔼</button>
-                            <button class="move-btn move-down-btn" data-key="${key}" ${index === sortedCategories.length - 1 ? 'disabled' : ''}>🔽</button>
-                        </span>
-                    `;
-
-                    categoryDiv.innerHTML = `
-                        <div class="budget-category-header" data-key="${key}">
-                            <span style="display: flex; align-items: center;">${reorderControlsHTML}${category.name}</span>
-                            <div style="display: flex; align-items: center; gap: 5px;">
-                                <button class="icon-btn edit-btn" data-key="${key}">✏️</button>
-                                <button class="icon-btn delete-btn" data-key="${key}" data-type="category">✖</button>
-                                <span class="toggle-icon" style="margin-left: 15px;">▼</span>
-                            </div>
-                        </div>
-                        <div class="budget-summary-text">${currencyFormatter.format(totalSpent)} spent of ${currencyFormatter.format(category.limit)}</div>
-                        <div class="progress-bar">
-                            <div class="progress-bar-inner" style="width: ${remainingPercent}%; background-color: ${barColor};"></div>
-                            <div class="progress-bar-inner progress-bar-overspent" style="width: ${overspentPercent}%;"></div>
-                        </div>
-                        <div class="budget-category-content"><div class="new-expense-form"><div class="input-group"><input type="number" placeholder="Amount" class="expense-amount-input" min="0" step="0.01"><input type="text" placeholder="Note (optional)" class="expense-note-input"><button class="add-expense-to-category-btn">Add Expense</button></div></div><ul class="expense-log">${expenseLogsHTML}</ul></div>`;
-                }
-                selectors.budgetCategoriesList.appendChild(categoryDiv);
-            });
+                const isSavings = item.type === 'savings'; 
+                const parentList = isSavings ? selectors.savingsGoalsList : selectors.budgetCategoriesList; 
+                const itemDiv = document.createElement('div'); 
+                if (item.isEditing) { 
+                    itemDiv.className = 'budget-category'; 
+                    itemDiv.innerHTML = `<div class="edit-category-form"><p><strong>Edit ${isSavings ? 'Goal' : 'Category'}</strong></p><div class="input-group"><input type="text" class="edit-name-input" value="${item.name}"><input type="number" class="edit-limit-input" value="${item.limit.toFixed(2)}" min="0" step="0.01"></div><div style="margin-top: 10px; display: flex; gap: 10px;"><button class="save-edit-btn" data-key="${key}">Save</button><button class="cancel-edit-btn" data-key="${key}" style="background-color: #777;">Cancel</button></div></div>`; 
+                } else { 
+                    itemDiv.className = `budget-category ${item.collapsed ? 'collapsed' : ''}`; 
+                    const totalContributions = toArray(item.expenses).reduce((sum, exp) => sum + exp.amount, 0); 
+                    let progressPercent, barColor, overspentPercent = 0, summaryText; 
+                    if (isSavings) { 
+                        progressPercent = item.limit > 0 ? Math.min(100, 100 * (totalContributions / item.limit)) : 0; 
+                        barColor = 'var(--income-color)'; 
+                        summaryText = `${currencyFormatter.format(totalContributions)} saved of ${currencyFormatter.format(item.limit)} goal`; 
+                    } else { 
+                        progressPercent = item.limit > 0 ? Math.max(0, 100 * (item.limit - totalContributions) / item.limit) : 100; 
+                        overspentPercent = item.limit > 0 ? Math.max(0, 100 * (totalContributions - item.limit) / item.limit) : 0; 
+                        barColor = getColorForPercentage(progressPercent); 
+                        summaryText = `${currencyFormatter.format(totalContributions)} spent of ${currencyFormatter.format(item.limit)}`; 
+                    } 
+                    const expenseLogsHTML = item.expenses ? Object.entries(item.expenses).map(([expKey, exp]) => { if (exp.isEditing) { return `<li class="edit-expense-form"><div class="input-group"><input type="number" class="edit-expense-amount-input" value="${exp.amount.toFixed(2)}"><input type="text" class="edit-expense-note-input" value="${exp.note || ''}"></div><div style="margin-top:5px; display:flex; gap:5px;"><button class="save-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">Save</button><button class="cancel-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}" style="background-color:#777">Cancel</button></div></li>`; } return `<li><span class="amount">${currencyFormatter.format(exp.amount)}</span><span class="note">${exp.note}</span><span class="date-stamp">${exp.date || ''}</span><div style="display:flex; gap:5px;"><button class="icon-btn edit-btn edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">✏️</button><button class="icon-btn delete-btn delete-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">✖</button></div></li>`; }).join('') : ''; 
+                    const reorderControlsHTML = isSavings ? '' : `<span class="reorder-controls"><button class="move-btn move-up-btn" data-key="${key}" ${index === 0 ? 'disabled' : ''}>🔼</button><button class="move-btn move-down-btn" data-key="${key}" ${index === sortedItems.length - 1 ? 'disabled' : ''}>🔽</button></span>`; 
+                    itemDiv.innerHTML = `<div class="budget-category-header" data-key="${key}"><span style="display: flex; align-items: center;">${challengeBadgeHTML}${reorderControlsHTML}${item.name}</span><div style="display: flex; align-items: center; gap: 5px;"><button class="icon-btn edit-btn" data-key="${key}">✏️</button><button class="icon-btn delete-btn" data-key="${key}" data-type="category">✖</button><span class="toggle-icon" style="margin-left: 15px;">▼</span></div></div><div class="budget-summary-text">${summaryText}</div><div class="progress-bar"><div class="progress-bar-inner" style="width: ${isSavings ? progressPercent : progressPercent}%; background-color: ${barColor};"></div>${!isSavings ? `<div class="progress-bar-inner progress-bar-overspent" style="width: ${overspentPercent}%;"></div>` : ''}</div><div class="budget-category-content"><div class="new-expense-form"><div class="input-group"><input type="number" placeholder="Amount" class="expense-amount-input" min="0" step="0.01"><input type="text" placeholder="Note (optional)" class="expense-note-input"><button class="add-expense-to-category-btn">${isSavings ? 'Add Contribution' : 'Add Expense'}</button></div></div><ul class="expense-log">${expenseLogsHTML}</ul></div>`; 
+                } 
+                parentList.appendChild(itemDiv); 
+            }); 
         }
         function renderHeader() { const accountName = state.accountName || `Shared Budget`; document.title = `Budget Buddy - ${accountName}`; selectors.currentAccountName.textContent = accountName; selectors.currentMonth.textContent = state.monthYear; }
-        function createCashflowChart(monthData) { if(cashflowChartInstance) cashflowChartInstance.destroy(); const totalIncome = calculateTotalIncome(monthData); const totalSpending = calculateTotalMonthlyExpenses(monthData) + calculateTotalBudgetedSpending(monthData); const ctx = document.getElementById('cashflow-chart').getContext('2d'); cashflowChartInstance = new Chart(ctx, { type: 'bar', data: { labels: ['Total Income', 'Total Spending'], datasets: [{ label: 'Amount', data: [totalIncome, totalSpending], backgroundColor: ['rgba(46, 204, 113, 0.7)', 'rgba(231, 76, 60, 0.7)'], borderColor: ['#2ecc71', '#e74c3c'], borderWidth: 1 }] }, options: { scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } } }); }
-        function createSpendingChart(monthData) { if(spendingChartInstance) spendingChartInstance.destroy(); const categorySpending = toArray(monthData.budgetedItems).map(cat => ({ name: cat.name, total: toArray(cat.expenses).reduce((sum, exp) => sum + exp.amount, 0) })).filter(c => c.total > 0); const ctx = document.getElementById('spending-chart').getContext('2d'); spendingChartInstance = new Chart(ctx, { type: 'pie', data: { labels: categorySpending.map(c => c.name), datasets: [{ data: categorySpending.map(c => c.total), borderWidth: 1 }] }, options: { plugins: { legend: { position: 'bottom' } } } }); }
+        function createCashflowChart(monthData) { if(cashflowChartInstance) cashflowChartInstance.destroy(); const totalIncome = calculateTotalIncome(monthData); const totalSpending = calculateTotalMonthlyExpenses(monthData) + calculateTotalBudgetedSpending(monthData) + calculateTotalContributions(monthData); const ctx = document.getElementById('cashflow-chart').getContext('2d'); cashflowChartInstance = new Chart(ctx, { type: 'bar', data: { labels: ['Total Income', 'Total Outgoing'], datasets: [{ label: 'Amount', data: [totalIncome, totalSpending], backgroundColor: ['rgba(46, 204, 113, 0.7)', 'rgba(231, 76, 60, 0.7)'], borderColor: ['#2ecc71', '#e74c3c'], borderWidth: 1 }] }, options: { scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } } }); }
+        function createSpendingChart(monthData) { if(spendingChartInstance) spendingChartInstance.destroy(); const categorySpending = getItemsByType(monthData, 'budget').map(cat => ({ name: cat.name, total: toArray(cat.expenses).reduce((sum, exp) => sum + exp.amount, 0) })).filter(c => c.total > 0); const ctx = document.getElementById('spending-chart').getContext('2d'); spendingChartInstance = new Chart(ctx, { type: 'pie', data: { labels: categorySpending.map(c => c.name), datasets: [{ data: categorySpending.map(c => c.total), borderWidth: 1 }] }, options: { plugins: { legend: { position: 'bottom' } } } }); }
+        
+        function renderChallenges() {
+            renderAvailableChallenges();
+            renderActiveChallenges();
+            renderTrophyCase();
+        }
 
+        function renderAvailableChallenges() {
+            selectors.availableChallengesList.innerHTML = '';
+            Object.entries(CHALLENGE_DEFINITIONS).forEach(([id, challenge]) => {
+                const item = document.createElement('div');
+                item.className = 'challenge-item';
+                item.innerHTML = `<h4>${challenge.badge} ${challenge.title}</h4><p>${challenge.description}</p><div class="challenge-item-footer"><span>Ready to try?</span><button class="start-challenge-btn btn-gold" data-challenge-id="${id}">Start</button></div>`;
+                selectors.availableChallengesList.appendChild(item);
+            });
+        }
+
+        function renderActiveChallenges() {
+            selectors.activeChallengesList.innerHTML = '';
+            const activeChallenges = state.activeChallenges || {};
+            if (Object.keys(activeChallenges).length === 0) {
+                selectors.activeChallengesList.innerHTML = '<p>You have no active or finished challenges this month.</p>';
+                return;
+            }
+
+            Object.entries(activeChallenges).forEach(([key, challenge]) => {
+                const definition = CHALLENGE_DEFINITIONS[challenge.challengeId];
+                let progressText = '';
+                switch (challenge.challengeId) {
+                    case 'stayUnderBudget':
+                        progressText = `${currencyFormatter.format(challenge.currentAmount || 0)} / ${currencyFormatter.format(challenge.targetAmount)} spent`;
+                        break;
+                    case 'noSpend':
+                        progressText = `Current streak: ${challenge.currentStreak || 0} / ${challenge.targetDays} days`;
+                        break;
+                    case 'goalBooster':
+                        progressText = `${currencyFormatter.format(challenge.currentAmount || 0)} / ${currencyFormatter.format(challenge.targetAmount)} saved`;
+                        break;
+                    case 'expenseLogger':
+                        progressText = `Current streak: ${challenge.currentStreak || 0} / ${challenge.targetDays} days`;
+                        break;
+                }
+
+                const item = document.createElement('div');
+                item.className = 'challenge-item';
+                if (challenge.status === 'completed') item.classList.add('completed');
+                if (challenge.status === 'failed') item.classList.add('failed');
+                if (challenge.status === 'active') item.classList.add('active-challenge-highlight');
+
+                item.innerHTML = `<h4>${definition.badge} ${definition.title} ${challenge.targetCategoryName ? `(${challenge.targetCategoryName})` : ''}</h4><p>${definition.description}</p><div class="challenge-item-footer"><span>${progressText}</span><button class="quit-challenge-btn btn-red" data-challenge-key="${key}">Quit</button></div>`;
+                
+                if (challenge.status !== 'active') {
+                    item.querySelector('.quit-challenge-btn').remove();
+                }
+                selectors.activeChallengesList.appendChild(item);
+            });
+        }
+
+        function renderTrophyCase() {
+            selectors.trophyCaseList.innerHTML = '';
+            const trophies = state.allTimeTrophies || {};
+            if (Object.keys(trophies).length === 0) {
+                selectors.trophyCaseList.innerHTML = '<p>Complete some challenges to earn trophies!</p>';
+                return;
+            }
+            let html = '';
+            Object.values(trophies).sort((a,b) => new Date(b.startDate) - new Date(a.startDate)).forEach(trophy => {
+                const definition = CHALLENGE_DEFINITIONS[trophy.challengeId];
+                 html += `<div class="challenge-item completed"><h4>${definition.badge} ${definition.title} ${trophy.targetCategoryName ? `(${trophy.targetCategoryName})` : ''}</h4><p>Completed: ${trophy.archivedMonth}</p></div>`;
+            });
+            selectors.trophyCaseList.innerHTML = html;
+        }
+
+        function renderReviewRewards(monthData) {
+            const rewardsSection = selectors.reviewRewardsSection;
+            const rewardsList = selectors.reviewRewardsList;
+            const challengesInHistory = monthData.activeChallenges || {};
+            const completedChallenges = Object.values(challengesInHistory).filter(c => c.status === 'completed');
+
+            rewardsList.innerHTML = ''; 
+            rewardsSection.style.display = 'block';
+
+            if (completedChallenges.length === 0) {
+                rewardsList.innerHTML = '<p>No challenges were completed this month.</p>';
+                return;
+            }
+
+            let html = '';
+            completedChallenges.forEach(challenge => {
+                const definition = CHALLENGE_DEFINITIONS[challenge.challengeId];
+                html += `<div class="challenge-item completed"><h4>${definition.badge} ${definition.title} ${challenge.targetCategoryName ? `(${challenge.targetCategoryName})` : ''}</h4></div>`;
+            });
+            rewardsList.innerHTML = html;
+        }
+
+        async function startChallenge(challengeId) {
+            const definition = CHALLENGE_DEFINITIONS[challengeId];
+            const inputs = [];
+
+            if (definition.requires === 'budgetCategory' || definition.requires === 'savingsGoal') {
+                const itemType = definition.requires === 'budgetCategory' ? 'budget' : 'savings';
+                const categories = Object.entries(state.budgetedItems || {}).filter(([k, v]) => (v.type || 'budget') === itemType);
+                if (categories.length === 0) {
+                    showChallengeAlert(`You need to create at least one ${itemType === 'budget' ? 'spending category' : 'savings goal'} to start this challenge.`);
+                    return;
+                }
+                inputs.push({
+                    type: 'select',
+                    id: 'category',
+                    label: `Select a category for this challenge:`,
+                    options: categories.map(([key, cat]) => ({ value: key, text: `${cat.name} (${currencyFormatter.format(cat.limit)})` }))
+                });
+            }
+
+            if (definition.prompt?.amount) { inputs.push({ type: 'number', id: 'amount', label: definition.prompt.amount }); }
+            if (definition.prompt?.days) { inputs.push({ type: 'number', id: 'days', label: definition.prompt.days }); }
+
+            const result = await showPrompt({ title: definition.title, inputs });
+            if (!result) return; 
+
+            let newChallenge = { challengeId, status: 'active', startDate: new Date().toISOString() };
+            if (result.category) {
+                newChallenge.targetCategoryKey = result.category;
+                newChallenge.targetCategoryName = state.budgetedItems[result.category].name;
+            }
+            if (result.amount) { newChallenge.targetAmount = parseFloat(result.amount); newChallenge.currentAmount = 0; }
+            if (result.days) { newChallenge.targetDays = parseInt(result.days); newChallenge.currentStreak = 0; }
+            if (challengeId === 'expenseLogger') { newChallenge.targetDays = definition.config.days; newChallenge.currentStreak = 0; newChallenge.lastLogDate = null; }
+            if (challengeId === 'noSpend') { newChallenge.lastLogDate = null; }
+
+            if (challengeId === 'stayUnderBudget') {
+                newChallenge.currentAmount = calculateSpentInCategory(newChallenge.targetCategoryKey);
+            }
+
+            push(ref(db, `budgets/${currentBudgetId}/activeChallenges`), newChallenge);
+        }
+
+        function awardTrophy(challengeKey, challengeData) {
+            const updates = {};
+            const newTrophyRef = push(ref(db, `budgets/${currentBudgetId}/allTimeTrophies`));
+            updates[`/allTimeTrophies/${newTrophyRef.key}`] = { ...challengeData, status: 'completed', archivedMonth: state.monthYear };
+            updates[`/activeChallenges/${challengeKey}`] = null;
+            update(dbRef, updates);
+        }
+        
+        function updateChallengeProgress(expenseData) {
+            if (state.challengesEnabled === false) return;
+            const activeChallenges = state.activeChallenges || {};
+            const updates = {};
+            const today = new Date().toISOString().split('T')[0];
+
+            Object.entries(activeChallenges).forEach(([key, challenge]) => {
+                if (challenge.status !== 'active') return;
+                const { categoryKey, amount } = expenseData;
+                let newStatus = null;
+
+                if (challenge.challengeId === 'stayUnderBudget' && categoryKey === challenge.targetCategoryKey) {
+                    const newTotal = (challenge.currentAmount || 0) + amount;
+                    updates[`/activeChallenges/${key}/currentAmount`] = newTotal;
+                    if (newTotal >= challenge.targetAmount) { newStatus = 'failed'; }
+                }
+                if (challenge.challengeId === 'goalBooster' && categoryKey === challenge.targetCategoryKey) {
+                    const newTotal = (challenge.currentAmount || 0) + amount;
+                    updates[`/activeChallenges/${key}/currentAmount`] = newTotal;
+                    if (newTotal >= challenge.targetAmount) { newStatus = 'completed'; }
+                }
+                if (challenge.challengeId === 'noSpend' && categoryKey === challenge.targetCategoryKey) {
+                    newStatus = 'failed';
+                }
+                if (challenge.challengeId === 'expenseLogger') {
+                    if (challenge.lastLogDate !== today) {
+                        const newStreak = (challenge.currentStreak || 0) + 1;
+                        updates[`/activeChallenges/${key}/currentStreak`] = newStreak;
+                        updates[`/activeChallenges/${key}/lastLogDate`] = today;
+                        if (newStreak >= challenge.targetDays) { newStatus = 'completed'; }
+                    }
+                }
+                
+                if (newStatus) {
+                    if (newStatus === 'completed') {
+                        awardTrophy(key, challenge); // Award trophy instead of just updating status
+                    } else {
+                        updates[`/activeChallenges/${key}/status`] = newStatus;
+                    }
+                    setTimeout(() => showChallengeAlert(`Challenge Updated: "${CHALLENGE_DEFINITIONS[challenge.challengeId].title}" is now ${newStatus}!`), 200);
+                }
+            });
+            if (Object.keys(updates).length > 0) { update(dbRef, updates); }
+        }
+        
+        // --- EVENT LISTENERS ---
         selectors.createNewBudgetBtn.addEventListener('click', startNewBudget);
         selectors.joinBudgetBtn.addEventListener('click', joinBudget);
         selectors.addIncomeBtn.addEventListener('click', () => { const name = selectors.incomeNameInput.value.trim(); const amount = parseFloat(selectors.incomeAmountInput.value); if(name && amount > 0) { push(ref(db, `budgets/${currentBudgetId}/income`), { name, amount, isEditing: false }); selectors.incomeNameInput.value = ''; selectors.incomeAmountInput.value = ''; } else { alert('Please enter a valid name and amount.'); } });
         selectors.addExpenseBtn.addEventListener('click', () => { const name = selectors.expenseNameInput.value.trim(); const amount = parseFloat(selectors.expenseAmountInput.value); if(name && amount > 0) { push(ref(db, `budgets/${currentBudgetId}/monthlyExpenses`), { name, amount, isEditing: false }); selectors.expenseNameInput.value = ''; selectors.expenseAmountInput.value = ''; } else { alert('Please enter a valid name and amount.'); } });
         selectors.addCategoryBtn.addEventListener('click', () => { selectors.newCategoryForm.style.display = 'block'; selectors.categoryNameInput.focus(); });
-        selectors.saveCategoryBtn.addEventListener('click', () => { const name = selectors.categoryNameInput.value.trim(); const limit = parseFloat(selectors.categoryLimitInput.value); if (name && limit > 0) { const newOrder = state.budgetedItems ? Object.keys(state.budgetedItems).length : 0; push(ref(db, `budgets/${currentBudgetId}/budgetedItems`), { name, limit, expenses: {}, collapsed: false, isEditing: false, order: newOrder }); selectors.categoryNameInput.value = ''; selectors.categoryLimitInput.value = ''; selectors.newCategoryForm.style.display = 'none'; } else { alert('Please enter a valid category name and budget limit.'); } });
+        selectors.saveCategoryBtn.addEventListener('click', () => { const name = selectors.categoryNameInput.value.trim(); const limit = parseFloat(selectors.categoryLimitInput.value); if (name && limit > 0) { const newOrder = state.budgetedItems ? Object.keys(state.budgetedItems).length : 0; push(ref(db, `budgets/${currentBudgetId}/budgetedItems`), { name, limit, expenses: {}, collapsed: false, isEditing: false, order: newOrder, type: 'budget' }); selectors.categoryNameInput.value = ''; selectors.categoryLimitInput.value = ''; selectors.newCategoryForm.style.display = 'none'; } else { alert('Please enter a valid category name and budget limit.'); } });
+        selectors.addSavingsGoalBtn.addEventListener('click', () => { selectors.newSavingsGoalForm.style.display = 'block'; selectors.savingsGoalNameInput.focus(); });
+        selectors.saveSavingsGoalBtn.addEventListener('click', () => { const name = selectors.savingsGoalNameInput.value.trim(); const limit = parseFloat(selectors.savingsGoalAmountInput.value); if (name && limit > 0) { const newOrder = state.budgetedItems ? Object.keys(state.budgetedItems).length : 0; push(ref(db, `budgets/${currentBudgetId}/budgetedItems`), { name, limit, expenses: {}, collapsed: false, isEditing: false, order: newOrder, type: 'savings' }); selectors.savingsGoalNameInput.value = ''; selectors.savingsGoalAmountInput.value = ''; selectors.newSavingsGoalForm.style.display = 'none'; } else { alert('Please enter a valid goal name and amount.'); } });
         selectors.incomeExpensesSection.querySelector('.section-header').addEventListener('click', (e) => { if (!e.target.closest('.icon-btn')) { set(ref(db, `budgets/${currentBudgetId}/incomeSectionCollapsed`), !state.incomeSectionCollapsed); } });
         selectors.allocationSection.querySelector('.section-header').addEventListener('click', (e) => { if (!e.target.closest('.icon-btn')) { set(ref(db, `budgets/${currentBudgetId}/allocationSectionCollapsed`), !state.allocationSectionCollapsed); } });
-        function toggleAllCategories(isCollapsed) { if (!state.budgetedItems) return; const updates = {}; Object.keys(state.budgetedItems).forEach(key => { updates[`/budgetedItems/${key}/collapsed`] = isCollapsed; }); update(dbRef, updates); }
+        function toggleAllCategories(isCollapsed) { if (!state.budgetedItems) return; const updates = {}; Object.keys(state.budgetedItems).forEach(key => { if (state.budgetedItems[key].type !== 'savings') updates[`/budgetedItems/${key}/collapsed`] = isCollapsed; }); update(dbRef, updates); }
         selectors.expandAllBtn.addEventListener('click', () => toggleAllCategories(false));
         selectors.collapseAllBtn.addEventListener('click', () => toggleAllCategories(true));
-        selectors.reorderToggleBtn.addEventListener('click', () => { const isActive = selectors.budgetCategoriesList.classList.toggle('reordering-active'); selectors.reorderToggleBtn.textContent = isActive ? 'Done' : 'Reorder'; renderBudgetCategories(); });
-        selectors.manageAccountsBtn.addEventListener('click', () => { selectors.sharableIdDisplay.value = currentBudgetId; selectors.editAccountNameInput.value = state.accountName || ''; selectors.accountsModal.style.display = 'flex'; });
+        selectors.reorderToggleBtn.addEventListener('click', () => { const list = selectors.budgetCategoriesList; const isActive = list.classList.toggle('reordering-active'); selectors.reorderToggleBtn.textContent = isActive ? 'Done' : 'Reorder'; renderCategorizedItems(); });
+        selectors.manageAccountsBtn.addEventListener('click', () => { selectors.sharableIdDisplay.value = currentBudgetId; selectors.editAccountNameInput.value = state.accountName || ''; selectors.toggleChallenges.checked = state.challengesEnabled !== false; selectors.accountsModal.style.display = 'flex'; });
+        selectors.toggleChallenges.addEventListener('change', (e) => { set(ref(db, `budgets/${currentBudgetId}/challengesEnabled`), e.target.checked); });
         selectors.saveAccountNameBtn.addEventListener('click', () => { const newName = selectors.editAccountNameInput.value.trim(); if (newName) { set(ref(db, `budgets/${currentBudgetId}/accountName`), newName); selectors.saveAccountNameBtn.textContent = 'Saved!'; setTimeout(() => { selectors.saveAccountNameBtn.textContent = 'Save'; closeModal(selectors.accountsModal); }, 1000); } else { alert('Please enter a valid budget name.'); } });
         selectors.copyIdBtn.addEventListener('click', () => { selectors.sharableIdDisplay.select(); document.execCommand('copy'); selectors.copyIdBtn.textContent = 'Copied!'; setTimeout(() => { selectors.copyIdBtn.textContent = 'Copy'; }, 1500); });
         selectors.leaveBudgetBtn.addEventListener('click', () => { localStorage.removeItem('lastBudgetId'); window.location.reload(); });
+        
         const closeModal = (modal) => modal.style.display = 'none';
         selectors.closeReviewModalBtn.addEventListener('click', () => closeModal(selectors.reviewModal));
         selectors.closeAccountsModalBtn.addEventListener('click', () => closeModal(selectors.accountsModal));
+        selectors.closeChallengeModalBtn.addEventListener('click', () => closeModal(selectors.challengeModal));
+        selectors.challengeCenterBtn.addEventListener('click', () => selectors.challengeModal.style.display = 'flex');
         selectors.noHistoryCloseBtn.addEventListener('click', () => closeModal(selectors.reviewModal));
-        window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeModal(selectors.reviewModal); closeModal(selectors.accountsModal); selectors.confirmModal.style.display = 'none'; } });
-        selectors.reviewBtn.addEventListener('click', () => { selectors.monthSelect.innerHTML = ''; if (history.length === 0) { selectors.chartsArea.style.display = 'none'; selectors.reviewControls.style.display = 'none'; selectors.noHistoryMsg.style.display = 'block'; } else { selectors.chartsArea.style.display = 'grid'; selectors.reviewControls.style.display = 'block'; selectors.noHistoryMsg.style.display = 'none'; history.forEach((month, index) => { const option = document.createElement('option'); option.value = index; option.textContent = month.monthYear; selectors.monthSelect.appendChild(option); }); selectors.monthSelect.dispatchEvent(new Event('change')); } selectors.reviewModal.style.display = 'flex'; });
-        selectors.monthSelect.addEventListener('change', (e) => { const selectedMonthData = history[e.target.value]; createCashflowChart(selectedMonthData); createSpendingChart(selectedMonthData); });
+        window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeModal(selectors.reviewModal); closeModal(selectors.accountsModal); closeModal(selectors.challengeModal); closeModal(selectors.promptModal); closeModal(selectors.confirmModal); } });
+        
+        selectors.reviewBtn.addEventListener('click', () => { 
+            selectors.reviewRewardsSection.style.display = 'none';
+            selectors.monthSelect.innerHTML = ''; 
+            if (history.length === 0) { 
+                selectors.chartsArea.style.display = 'none'; 
+                selectors.reviewControls.style.display = 'none'; 
+                selectors.noHistoryMsg.style.display = 'block'; 
+            } else { 
+                selectors.chartsArea.style.display = 'grid'; 
+                selectors.reviewControls.style.display = 'block'; 
+                selectors.noHistoryMsg.style.display = 'none'; 
+                history.forEach((month, index) => { const option = document.createElement('option'); option.value = index; option.textContent = month.monthYear; selectors.monthSelect.appendChild(option); }); 
+                selectors.monthSelect.dispatchEvent(new Event('change')); 
+            } 
+            selectors.reviewModal.style.display = 'flex'; 
+        });
+
+        selectors.monthSelect.addEventListener('change', (e) => { 
+            const selectedMonthData = history[e.target.value]; 
+            createCashflowChart(selectedMonthData); 
+            createSpendingChart(selectedMonthData);
+            renderReviewRewards(selectedMonthData);
+        });
 
         document.body.addEventListener('click', async (e) => {
-            const categoryHeader = e.target.closest('.budget-category-header');
-            if (categoryHeader && !e.target.closest('.icon-btn') && !e.target.closest('.move-btn')) { const key = categoryHeader.dataset.key; const currentCollapsedState = state.budgetedItems[key]?.collapsed || false; set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}/collapsed`), !currentCollapsedState); return; }
-
-            const button = e.target.closest('button');
-            if (!button) return;
-
-            if (button.classList.contains('move-up-btn') || button.classList.contains('move-down-btn')) {
-                const keyToMove = button.dataset.key;
-                let sortedCategories = Object.entries(state.budgetedItems).sort((a, b) => a[1].order - b[1].order);
-                const currentIndex = sortedCategories.findIndex(([key, cat]) => key === keyToMove);
-                if (currentIndex === -1) return;
-                const isMovingUp = button.classList.contains('move-up-btn');
-                const swapIndex = isMovingUp ? currentIndex - 1 : currentIndex + 1;
-                if (swapIndex >= 0 && swapIndex < sortedCategories.length) {
-                    const [key1, cat1] = sortedCategories[currentIndex];
-                    const [key2, cat2] = sortedCategories[swapIndex];
-                    const updates = {};
-                    updates[`/budgetedItems/${key1}/order`] = cat2.order;
-                    updates[`/budgetedItems/${key2}/order`] = cat1.order;
-                    update(dbRef, updates);
-                }
+            const challengeBadge = e.target.closest('.category-challenge-badge');
+            if (challengeBadge) {
+                selectors.challengeModal.style.display = 'flex';
                 return;
             }
+            
+            const button = e.target.closest('button');
+            if (!button) {
+                const categoryHeader = e.target.closest('.budget-category-header');
+                if (categoryHeader && !e.target.closest('.icon-btn') && !e.target.closest('.move-btn')) { const key = categoryHeader.dataset.key; const currentCollapsedState = state.budgetedItems[key]?.collapsed || false; set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}/collapsed`), !currentCollapsedState); }
+                return;
+            }
+
+            if (button.classList.contains('start-challenge-btn')) { startChallenge(button.dataset.challengeId); return; }
+            if (button.classList.contains('quit-challenge-btn')) { if (await showConfirm('Are you sure you want to quit this challenge? This cannot be undone.')) { remove(ref(db, `budgets/${currentBudgetId}/activeChallenges/${button.dataset.challengeKey}`)); } return; }
+
+            if (button.classList.contains('move-up-btn') || button.classList.contains('move-down-btn')) { const keyToMove = button.dataset.key; let sortedCategories = Object.entries(state.budgetedItems).filter(([k,c]) => c.type !== 'savings').sort((a, b) => a[1].order - b[1].order); const currentIndex = sortedCategories.findIndex(([key, cat]) => key === keyToMove); if (currentIndex === -1) return; const isMovingUp = button.classList.contains('move-up-btn'); const swapIndex = isMovingUp ? currentIndex - 1 : currentIndex + 1; if (swapIndex >= 0 && swapIndex < sortedCategories.length) { const [key1, cat1] = sortedCategories[currentIndex]; const [key2, cat2] = sortedCategories[swapIndex]; const updates = {}; updates[`/budgetedItems/${key1}/order`] = cat2.order; updates[`/budgetedItems/${key2}/order`] = cat1.order; update(dbRef, updates); } return; }
 
             const { key, type, categoryKey, expenseKey } = button.dataset;
             const dbPath = type === 'income' ? 'income' : 'monthlyExpenses';
 
-            if (button.classList.contains('delete-expense-btn')) { if (await showConfirm(`Are you sure you want to delete this expense?`)) { remove(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses/${expenseKey}`)); } } 
+            if (button.classList.contains('add-expense-to-category-btn')) {
+                const form = button.closest('.new-expense-form');
+                const catKey = form.closest('.budget-category').querySelector('.budget-category-header').dataset.key;
+                const amountInput = form.querySelector('.expense-amount-input');
+                const noteInput = form.querySelector('.expense-note-input');
+                const amount = parseFloat(amountInput.value);
+                const note = noteInput.value.trim();
+                if (amount > 0) {
+                    push(ref(db, `budgets/${currentBudgetId}/budgetedItems/${catKey}/expenses`), { amount, note, date: new Date().toLocaleDateString(), isEditing: false });
+                    updateChallengeProgress({ categoryKey: catKey, amount });
+                    amountInput.value = ''; noteInput.value = '';
+                } else { alert('Please enter a valid amount.'); }
+            } 
+            else if (button.classList.contains('delete-expense-btn')) { if (await showConfirm(`Are you sure you want to delete this entry?`)) { remove(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses/${expenseKey}`)); } } 
             else if (button.classList.contains('delete-btn')) { if (await showConfirm(`Are you sure you want to delete this item?`)) { if (type === 'income' || type === 'expense') { remove(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}`)); } else if (type === 'category') { remove(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}`)); } } } 
-            else if (button.classList.contains('add-expense-to-category-btn')) { const form = button.closest('.new-expense-form'); const categoryKey = form.closest('.budget-category').querySelector('.budget-category-header').dataset.key; const amountInput = form.querySelector('.expense-amount-input'); const noteInput = form.querySelector('.expense-note-input'); const amount = parseFloat(amountInput.value); const note = noteInput.value.trim(); if (amount > 0) { push(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses`), { amount, note, date: new Date().toLocaleDateString(), isEditing: false }); amountInput.value = ''; noteInput.value = ''; } else { alert('Please enter a valid amount.'); } } 
             else if (button.classList.contains('edit-item-btn')) { set(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}/isEditing`), true); }
             else if (button.classList.contains('cancel-item-btn')) { set(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}/isEditing`), false); }
             else if (button.classList.contains('save-item-btn')) { const form = button.closest('.input-group'); const newName = form.querySelector('.edit-item-name-input').value.trim(); const newAmount = parseFloat(form.querySelector('.edit-item-amount-input').value); if (newName && newAmount > 0) { update(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}`), { name: newName, amount: newAmount, isEditing: false }); } else { alert('Please enter a valid name and amount.'); } }
             else if (button.classList.contains('edit-btn')) { if (button.classList.contains('edit-expense-btn')) { set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses/${expenseKey}/isEditing`), true); } else { set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}/isEditing`), true); } } 
-            else if (button.classList.contains('save-edit-btn')) { const form = button.closest('.edit-category-form'); const newName = form.querySelector('.edit-name-input').value.trim(); const newLimit = parseFloat(form.querySelector('.edit-limit-input').value); if (newName && newLimit > 0) { update(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}`), { name: newName, limit: newLimit, isEditing: false }); } else { alert('Please enter a valid name and limit.'); } } 
+            else if (button.classList.contains('save-edit-btn')) { const form = button.closest('.edit-category-form'); const newName = form.querySelector('.edit-name-input').value.trim(); const newLimit = parseFloat(form.querySelector('.edit-limit-input').value); if (newName && newLimit > 0) { update(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}`), { name: newName, limit: newLimit, isEditing: false }); } else { alert('Please enter a valid name and limit/goal amount.'); } } 
             else if (button.classList.contains('save-edit-expense-btn')) { const form = button.closest('li'); const newAmount = parseFloat(form.querySelector('.edit-expense-amount-input').value); const newNote = form.querySelector('.edit-expense-note-input').value.trim(); if (newAmount > 0) { const originalDate = state.budgetedItems[categoryKey].expenses[expenseKey].date; update(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses/${expenseKey}`), { date: originalDate, amount: newAmount, note: newNote, isEditing: false }); } else { alert('Please enter a valid amount.'); } } 
             else if (button.classList.contains('cancel-edit-btn')) { set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}/isEditing`), false); } 
             else if (button.classList.contains('cancel-edit-expense-btn')) { set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses/${expenseKey}/isEditing`), false); }
