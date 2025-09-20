@@ -47,7 +47,7 @@
         .summary-display { background: linear-gradient(135deg, var(--accent-color), var(--accent-hover)); color: white; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
         .summary-display h2 { margin: 0; font-size: 1.2em; font-weight: 500; color: white; }
         .summary-display p { font-size: 2.5em; font-weight: bold; margin: 5px 0 0; }
-        .section { margin-bottom: 25px; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; }
+        .section { margin-bottom: 25px; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; transition: background-color 0.3s, border-color 0.3s; }
         .section-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); margin-bottom: 10px; }
         .section-header h3 { margin: 0; }
         .toggle-icon { font-size: 1.5em; transition: transform 0.3s; }
@@ -115,8 +115,8 @@
         #challenge-modal .challenge-section h3 { border-bottom: 1px solid var(--challenge-dark-gold); color: var(--challenge-dark-gold); padding-bottom: 8px; margin-bottom: 15px; }
         .challenge-item { background-color: #fff; border: 1px solid var(--border-color); border-left: 5px solid var(--challenge-dark-gold); border-radius: 5px; padding: 10px; margin-bottom: 10px; transition: background-color 0.3s, border-color 0.3s; }
         .challenge-item.completed { border-left-color: var(--income-color) !important; background-color: #e8f8ef !important; }
-        #review-rewards-list .challenge-item.completed { background-color: var(--challenge-bg); border-left-color: var(--challenge-dark-gold); }
-        #review-rewards-list .challenge-item.completed h4, #trophy-case-list .challenge-item.completed h4 { color: var(--challenge-text); }
+        #review-rewards-list .challenge-item.completed { background-color: #e8f8ef; border-left-color: var(--income-color); }
+        #review-rewards-list .challenge-item.completed h4, #earned-trophies-list .challenge-item.completed h4 { color: var(--challenge-text); }
         .challenge-item.failed { border-left-color: var(--expense-color) !important; background-color: #fbe9e7 !important; }
         #active-challenges-list .challenge-item.active-challenge-highlight { background-color: var(--challenge-dark-gold); border-color: var(--challenge-gold); color: white; }
         #active-challenges-list .challenge-item.active-challenge-highlight h4, #active-challenges-list .challenge-item.active-challenge-highlight p, #active-challenges-list .challenge-item.active-challenge-highlight .challenge-item-footer { color: white; }
@@ -132,7 +132,12 @@
         .category-challenge-badge:hover { filter: grayscale(0); }
         .modal-overlay.challenge-alert .modal-content { background-color: var(--challenge-bg); color: var(--challenge-text); border: 2px solid var(--challenge-dark-gold); }
         .setting-toggle { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; }
-        
+        #review-tabs { display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 15px; }
+        .tab-btn { background-color: #f0f0f0; color: var(--text-color); border-bottom: none; border-radius: 5px 5px 0 0; }
+        .tab-btn.active { background-color: var(--secondary-bg); border: 1px solid var(--border-color); border-bottom: 1px solid var(--secondary-bg); margin-bottom: -1px; font-weight: bold; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
         @media (max-width: 600px) { 
             .chart-container { grid-template-columns: 1fr; } 
             #manage-accounts-btn { top: 15px; right: 15px; }
@@ -187,7 +192,10 @@
                 <div style="display: flex; justify-content: space-between; font-size: 0.9em; margin-bottom: 8px;"><span><strong>Available to Allocate:</strong> <span id="total-to-budget">$0.00</span></span></div>
                 <div style="font-size: 0.9em; margin-bottom: 8px; color: #555;">- Allocated to Budgets: <span id="allocated-in-budgets">$0.00</span></div>
                 <div style="font-size: 0.9em; margin-bottom: 8px; color: #555;">- Allocated to Savings: <span id="allocated-to-savings">$0.00</span></div>
-                <div class="progress-bar" style="height: 12px; margin-top: 5px;"><div id="allocation-progress-bar" class="progress-bar-inner"></div></div>
+                <div class="progress-bar" style="height: 12px; margin-top: 5px;">
+                    <div id="allocation-progress-bar" class="progress-bar-inner"></div>
+                    <div id="allocation-overspent-bar" class="progress-bar-inner progress-bar-overspent"></div>
+                </div>
                 <div style="text-align: right; font-weight: bold; margin-top: 8px;">Remaining to Allocate: <span id="remaining-to-allocate">$0.00</span></div>
             </div>
         </div>
@@ -201,8 +209,28 @@
     </div>
 
     <div class="modal-overlay" id="onboarding-modal"><div class="modal-content"><div class="modal-header"><h2>Welcome to Budget Buddy</h2></div><p>Create a new budget to share, or join one using an ID from a friend.</p><button id="create-new-budget-btn" style="width: 100%; margin-bottom: 15px;">Create a New Shared Budget</button><hr><p style="margin-top: 15px;"><strong>Or Join Existing Budget</strong></p><div class="input-group"><input type="text" id="join-budget-id-input" placeholder="Enter Sharable ID"><button id="join-budget-btn">Join</button></div></div></div>
-    <div class="modal-overlay" id="review-modal"><div class="modal-content"><div class="modal-header"><h2>Monthly Review</h2><button class="close-btn" id="close-review-modal-btn">&times;</button></div><div id="review-content"><div id="review-controls" style="width: 100%;"><label for="month-select">Select Month:</label><select id="month-select" style="padding: 8px; width: 100%;"></select></div><div id="no-history-msg" style="display: none; text-align: center; margin-top: 20px;"><p>No historical data for this budget yet.</p><button id="no-history-close-btn" style="margin-top: 15px;">Go Back</button></div><div class="chart-container" id="charts-area"><div><h3>Cash Flow</h3><canvas id="cashflow-chart"></canvas></div><div><h3>Spending Breakdown</h3><canvas id="spending-chart"></canvas></div></div><div class="section" id="review-rewards-section" style="margin-top: 20px; display: none;"><h3>🏆 Monthly Achievements</h3><div id="review-rewards-list"></div></div></div></div></div>
-    <div class="modal-overlay" id="accounts-modal"><div class="modal-content"><div class="modal-header"><h2>Budget Settings & Sharing</h2><button class="close-btn" id="close-accounts-modal-btn">&times;</button></div><div id="accounts-content"><h3>Edit Budget Name</h3><div class="input-group"><input type="text" id="edit-account-name-input" placeholder="Budget Name"><button id="save-account-name-btn">Save</button></div><hr><h3>Your Sharable Budget ID</h3><p style="font-size: 0.9em; color: #555;">Give this ID to others so they can join and edit this budget in real-time.</p><div class="input-group"><input type="text" id="sharable-id-display" readonly style="background-color: #f0f0f0; font-weight: bold;"><button id="copy-id-btn">Copy</button></div><hr><h3>Features</h3><div class="setting-toggle"><label for="toggle-challenges">Enable Challenge Center</label><input type="checkbox" id="toggle-challenges"></div><hr><button id="leave-budget-btn" style="width:100%; background-color: var(--expense-color);">Leave Budget</button></div></div></div>
+    <div class="modal-overlay" id="review-modal"><div class="modal-content"><div class="modal-header"><h2>Monthly Review</h2><button class="close-btn" id="close-review-modal-btn">&times;</button></div>
+        <div id="review-content">
+            <div id="review-tabs">
+                <button class="tab-btn active" data-tab="single-month-view">Single Month</button>
+                <button class="tab-btn" data-tab="compare-months-view">Compare Months</button>
+            </div>
+            
+            <div id="single-month-view" class="tab-content active">
+                <div id="review-controls" style="width: 100%;"><label for="month-select">Select Month:</label><select id="month-select" style="padding: 8px; width: 100%;"></select></div>
+                <div id="no-history-msg" style="display: none; text-align: center; margin-top: 20px;"><p>No historical data for this budget yet.</p><button id="no-history-close-btn" style="margin-top: 15px;">Go Back</button></div>
+                <div class="chart-container" id="charts-area"><div><h3>Cash Flow</h3><canvas id="cashflow-chart"></canvas></div><div><h3>Spending Breakdown</h3><canvas id="spending-chart"></canvas></div></div>
+                <div class="section" id="review-rewards-section" style="margin-top: 20px; display: none;"><h3>🏆 Monthly Achievements</h3><div id="review-rewards-list"></div></div>
+                <div class="section" id="review-expense-log-section" style="margin-top: 20px; display: none;"><h3>🧾 Detailed Expense Log</h3><div id="review-expense-log-list" style="max-height: 200px; overflow-y: auto; font-size: 0.9em;"></div></div>
+            </div>
+
+            <div id="compare-months-view" class="tab-content">
+                <div id="comparison-charts-area"></div>
+                 <div id="no-comparison-msg" style="display: none; text-align: center; margin-top: 20px;"><p>You need at least two months of history to make a comparison.</p></div>
+            </div>
+        </div>
+    </div></div>
+    <div class="modal-overlay" id="accounts-modal"><div class="modal-content"><div class="modal-header"><h2>Budget Settings & Sharing</h2><button class="close-btn" id="close-accounts-modal-btn">&times;</button></div><div id="accounts-content"><h3>Edit Budget Name</h3><div class="input-group"><input type="text" id="edit-account-name-input" placeholder="Budget Name"><button id="save-account-name-btn">Save</button></div><hr><h3>Your Sharable Budget ID</h3><p style="font-size: 0.9em; color: #555;">Give this ID to others so they can join and edit this budget in real-time.</p><div class="input-group"><input type="text" id="sharable-id-display" readonly style="background-color: #f0f0f0; font-weight: bold;"><button id="copy-id-btn">Copy</button></div><hr><h3>Features</h3><div class="setting-toggle"><label for="toggle-challenges">Enable Challenge Center</label><input type="checkbox" id="toggle-challenges"></div><div class="setting-toggle"><label for="toggle-rollover">Enable Rollover Controls</label><input type="checkbox" id="toggle-rollover"></div><hr><button id="leave-budget-btn" style="width:100%; background-color: var(--expense-color);">Leave Budget</button></div></div></div>
     <div class="modal-overlay" id="confirm-modal"><div class="modal-content"><p id="confirm-msg"></p><div class="confirm-actions"><button id="confirm-cancel-btn" style="background-color: #777;">Cancel</button><button id="confirm-ok-btn">Confirm</button></div></div></div>
     
     <div class="modal-overlay" id="challenge-modal">
@@ -219,9 +247,9 @@
                     <div id="available-challenges-list"></div>
                 </div>
                 <hr style="margin: 25px 0;">
-                <div class="challenge-section" id="trophy-case-section">
-                    <h3>🏆 Trophy Case (All-Time)</h3>
-                    <div id="trophy-case-list"></div>
+                <div class="challenge-section" id="earned-trophies-section">
+                    <h3>🏆 Earned Trophies</h3>
+                    <div id="earned-trophies-list"></div>
                 </div>
             </div>
         </div>
@@ -250,7 +278,7 @@
         let currentBudgetId = null;
         let dbRef = null;
         let history = [];
-        let cashflowChartInstance, spendingChartInstance;
+        let cashflowChartInstance, spendingChartInstance, comparisonCashflowChart, comparisonSpendingChart;
 
         const selectors = {
             appContent: document.querySelector('.app-content'),
@@ -273,7 +301,9 @@
             editAccountNameInput: document.getElementById('edit-account-name-input'), saveAccountNameBtn: document.getElementById('save-account-name-btn'),
             confirmModal: document.getElementById('confirm-modal'), confirmMsg: document.getElementById('confirm-msg'), confirmOkBtn: document.getElementById('confirm-ok-btn'), confirmCancelBtn: document.getElementById('confirm-cancel-btn'),
             onboardingModal: document.getElementById('onboarding-modal'), createNewBudgetBtn: document.getElementById('create-new-budget-btn'), joinBudgetBtn: document.getElementById('join-budget-btn'), joinBudgetIdInput: document.getElementById('join-budget-id-input'),
-            totalToBudget: document.getElementById('total-to-budget'), allocatedInBudgets: document.getElementById('allocated-in-budgets'), allocatedToSavings: document.getElementById('allocated-to-savings'), remainingToAllocate: document.getElementById('remaining-to-allocate'), allocationProgressBar: document.getElementById('allocation-progress-bar'),
+            totalToBudget: document.getElementById('total-to-budget'), allocatedInBudgets: document.getElementById('allocated-in-budgets'), allocatedToSavings: document.getElementById('allocated-to-savings'), remainingToAllocate: document.getElementById('remaining-to-allocate'), 
+            allocationProgressBar: document.getElementById('allocation-progress-bar'),
+            allocationOverspentBar: document.getElementById('allocation-overspent-bar'),
             challengeCenterBtn: document.getElementById('challenge-center-btn'),
             challengeModal: document.getElementById('challenge-modal'),
             closeChallengeModalBtn: document.getElementById('close-challenge-modal-btn'),
@@ -287,8 +317,16 @@
             promptCancelBtn: document.getElementById('prompt-cancel-btn'),
             reviewRewardsSection: document.getElementById('review-rewards-section'),
             reviewRewardsList: document.getElementById('review-rewards-list'),
-            trophyCaseList: document.getElementById('trophy-case-list'),
+            earnedTrophiesList: document.getElementById('earned-trophies-list'),
             toggleChallenges: document.getElementById('toggle-challenges'),
+            toggleRollover: document.getElementById('toggle-rollover'),
+            reviewTabs: document.getElementById('review-tabs'),
+            singleMonthView: document.getElementById('single-month-view'),
+            compareMonthsView: document.getElementById('compare-months-view'),
+            noComparisonMsg: document.getElementById('no-comparison-msg'),
+            comparisonChartsArea: document.getElementById('comparison-charts-area'),
+            reviewExpenseLogSection: document.getElementById('review-expense-log-section'),
+            reviewExpenseLogList: document.getElementById('review-expense-log-list'),
         };
 
         const currencyFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
@@ -324,7 +362,7 @@
             }
         };
 
-        function createNewBudget() { return { accountName: 'My Shared Budget', income: {}, monthlyExpenses: {}, budgetedItems: {}, monthYear: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }), incomeSectionCollapsed: false, allocationSectionCollapsed: false, history: {}, activeChallenges: {}, allTimeTrophies: {}, challengesEnabled: true }; }
+        function createNewBudget() { return { accountName: 'My Shared Budget', income: {}, monthlyExpenses: {}, budgetedItems: {}, monthYear: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }), incomeSectionCollapsed: false, allocationSectionCollapsed: false, history: {}, activeChallenges: {}, earnedTrophies: {}, challengesEnabled: true, features: { rolloverControlEnabled: false } }; }
         function startNewBudget() { const newBudgetRef = push(ref(db, 'budgets')); const newBudgetId = newBudgetRef.key; set(newBudgetRef, createNewBudget()); connectToBudget(newBudgetId); }
         async function joinBudget() { const budgetId = selectors.joinBudgetIdInput.value.trim(); if (!budgetId) { alert('Please enter a budget ID.'); return; } const budgetRef = ref(db, `budgets/${budgetId}`); const snapshot = await get(budgetRef); if (snapshot.exists()) { connectToBudget(budgetId); } else { alert('Budget ID not found. Please check the ID and try again.'); } }
         function connectToBudget(budgetId) {
@@ -333,30 +371,84 @@
             onValue(dbRef, (snapshot) => { const data = snapshot.val(); if (data) { state = data; history = state.history ? Object.values(state.history).sort((a,b) => new Date(b.monthYear).getTime() - new Date(a.monthYear).getTime()) : []; checkForNewMonth(); render(); selectors.onboardingModal.style.display = 'none'; selectors.appContent.style.display = 'block'; } });
             localStorage.setItem('lastBudgetId', budgetId);
         }
-        function checkForNewMonth() { 
-            const currentMonthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' }); 
-            if (state.monthYear && new Date(currentMonthYear) > new Date(state.monthYear)) { 
-                alert(`Welcome to a new month! Your previous month's data for "${state.accountName}" has been archived.`); 
+        
+        function checkForNewMonth() {
+            const currentMonthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+            if (state.monthYear && new Date(currentMonthYear) > new Date(state.monthYear)) {
                 
-                const updates = {};
-                const completed = Object.values(state.activeChallenges || {}).filter(c => c.status === 'completed');
-                completed.forEach(c => {
-                    const newTrophyRef = push(ref(db, `budgets/${currentBudgetId}/allTimeTrophies`));
-                    updates[`/allTimeTrophies/${newTrophyRef.key}`] = { ...c, archivedMonth: state.monthYear };
-                });
-                if (Object.keys(updates).length > 0) {
-                    update(dbRef, updates);
-                }
+                const previousMonthName = state.monthYear;
 
-                const oldStateForHistory = { ...state }; 
-                delete oldStateForHistory.history; 
-                const historyRef = push(ref(db, `budgets/${currentBudgetId}/history`)); 
-                set(historyRef, oldStateForHistory); 
-                
-                const newBudgets = state.budgetedItems ? Object.entries(state.budgetedItems).reduce((acc, [key, item]) => { const totalSpent = (item.expenses ? Object.values(item.expenses) : []).reduce((sum, exp) => sum + exp.amount, 0); const unspent = item.limit - totalSpent; const newLimit = item.type === 'savings' ? item.limit : (unspent > 0 ? item.limit + unspent : item.limit); acc[key] = { name: item.name, limit: newLimit, expenses: {}, collapsed: false, isEditing: false, order: item.order, type: item.type }; return acc; }, {}) : {}; 
-                const newMonthData = { ...state, monthYear: currentMonthYear, budgetedItems: newBudgets, activeChallenges: {}, allTimeTrophies: { ...state.allTimeTrophies, ...updates } }; 
-                set(dbRef, newMonthData); 
-            } 
+                const evaluatedChallenges = { ...(state.activeChallenges || {}) };
+                const newlyCompletedKeysForTrophy = [];
+
+                Object.entries(evaluatedChallenges).forEach(([key, challenge]) => {
+                    if (challenge.status === 'active') {
+                        let isCompleted = false;
+
+                        if (challenge.challengeId === 'stayUnderBudget') {
+                            const category = state.budgetedItems?.[challenge.targetCategoryKey];
+                            if (category) {
+                                const totalSpent = (category.expenses ? Object.values(category.expenses) : []).reduce((sum, exp) => sum + exp.amount, 0);
+                                if (totalSpent <= challenge.targetAmount) {
+                                    isCompleted = true;
+                                }
+                            }
+                        }
+
+                        if (isCompleted) {
+                            evaluatedChallenges[key].status = 'completed';
+                            newlyCompletedKeysForTrophy.push(key);
+                        } else {
+                            evaluatedChallenges[key].status = 'failed';
+                        }
+                    }
+                });
+
+                const stateForHistory = { ...state, activeChallenges: evaluatedChallenges };
+                delete stateForHistory.history;
+                const newHistoryKey = push(ref(db, `budgets/${currentBudgetId}/history`)).key;
+                const newHistory = { ...(state.history || {}), [newHistoryKey]: stateForHistory };
+
+                const newEarnedTrophies = {};
+                newlyCompletedKeysForTrophy.forEach(key => {
+                    const challenge = evaluatedChallenges[key];
+                    const newTrophyKey = push(ref(db, `budgets/${currentBudgetId}/earnedTrophies`)).key;
+                    newEarnedTrophies[newTrophyKey] = { ...challenge, archivedMonth: previousMonthName };
+                });
+
+                const newBudgets = state.budgetedItems ? Object.entries(state.budgetedItems).reduce((acc, [key, item]) => {
+                    const totalSpent = (item.expenses ? Object.values(item.expenses) : []).reduce((sum, exp) => sum + exp.amount, 0);
+                    const unspent = item.limit - totalSpent;
+                    
+                    let newLimit = item.limit;
+                    if (item.type !== 'savings' && item.rolloverEnabled && unspent > 0) {
+                        newLimit = item.limit + unspent;
+                    }
+                    
+                    acc[key] = { name: item.name, limit: newLimit, expenses: {}, collapsed: item.collapsed, isEditing: false, order: item.order, type: item.type, rolloverEnabled: item.rolloverEnabled || false };
+                    return acc;
+                }, {}) : {};
+
+                const newMonthData = {
+                    ...state,
+                    monthYear: currentMonthYear,
+                    budgetedItems: newBudgets,
+                    activeChallenges: {},
+                    earnedTrophies: newEarnedTrophies,
+                    history: newHistory,
+                };
+
+                set(dbRef, newMonthData).then(() => {
+                    if (newlyCompletedKeysForTrophy.length > 0) {
+                        setTimeout(() => {
+                            const challengeNames = newlyCompletedKeysForTrophy.map(key => `"${CHALLENGE_DEFINITIONS[evaluatedChallenges[key].challengeId].title}"`).join(' and ');
+                            showChallengeAlert(`Congratulations! You completed the ${challengeNames} challenge for ${previousMonthName} and earned a new trophy!`);
+                        }, 500);
+                    } else {
+                         alert(`Welcome to a new month! Your previous month's data for "${state.accountName}" has been archived.`);
+                    }
+                });
+            }
         }
         
         function showChallengeAlert(message) {
@@ -468,14 +560,40 @@
             const totalAllocatedToBudgets = calculateTotalAllocatedToBudgets(state);
             const totalAllocatedToSavings = calculateTotalAllocatedToSavings(state);
             const remainingToAllocate = incomeAfterBills - totalAllocatedToBudgets - totalAllocatedToSavings;
-            const allocationPercent = incomeAfterBills > 0 ? (remainingToAllocate / incomeAfterBills) * 100 : (remainingToAllocate > 0 ? 100 : 0);
+            
+            // Allocation Bar Logic
+            let remainingPercent = 0;
+            let overspentPercent = 0;
+            if (incomeAfterBills > 0) {
+                if (remainingToAllocate >= 0) {
+                    remainingPercent = (remainingToAllocate / incomeAfterBills) * 100;
+                } else {
+                    remainingPercent = 0;
+                    overspentPercent = (Math.abs(remainingToAllocate) / incomeAfterBills) * 100;
+                }
+            } else if (remainingToAllocate > 0) {
+                remainingPercent = 100;
+            }
+
+            selectors.allocationProgressBar.style.width = `${remainingPercent}%`;
+            selectors.allocationProgressBar.style.backgroundColor = getColorForPercentage(remainingPercent);
+            selectors.allocationOverspentBar.style.width = `${overspentPercent}%`;
+
+            // Text and Highlighting Logic
             selectors.totalToBudget.textContent = currencyFormatter.format(incomeAfterBills);
             selectors.allocatedInBudgets.textContent = currencyFormatter.format(totalAllocatedToBudgets);
             selectors.allocatedToSavings.textContent = currencyFormatter.format(totalAllocatedToSavings);
             selectors.remainingToAllocate.textContent = currencyFormatter.format(remainingToAllocate);
-            selectors.allocationProgressBar.style.width = `${Math.max(0, allocationPercent)}%`;
-            selectors.allocationProgressBar.style.backgroundColor = getColorForPercentage(allocationPercent);
-            if (remainingToAllocate < 0) { selectors.remainingToAllocate.style.color = 'var(--expense-color)'; } else { selectors.remainingToAllocate.style.color = 'var(--text-color)'; }
+
+            if (remainingToAllocate < 0) {
+                selectors.remainingToAllocate.style.color = 'var(--expense-color)';
+                selectors.allocationSection.style.borderColor = 'var(--expense-color)';
+                selectors.allocationSection.style.backgroundColor = '#fbe9e7';
+            } else {
+                selectors.remainingToAllocate.style.color = 'var(--text-color)';
+                selectors.allocationSection.style.borderColor = 'var(--border-color)';
+                selectors.allocationSection.style.backgroundColor = 'transparent';
+            }
 
             if (challengesEnabled) {
                 const activeChallengeCount = Object.values(state.activeChallenges || {}).filter(c => c.status === 'active').length;
@@ -504,11 +622,14 @@
             selectors.savingsGoalsList.innerHTML = ''; 
             if (!state.budgetedItems) return; 
 
-            let challengedCategoryKeys = {};
+            let challengedCategoryInfo = {};
             if (state.challengesEnabled !== false) {
                 Object.values(state.activeChallenges || {}).forEach(c => {
                     if (c.targetCategoryKey && c.status === 'active') {
-                        challengedCategoryKeys[c.targetCategoryKey] = true;
+                        const definition = CHALLENGE_DEFINITIONS[c.challengeId];
+                        if(definition) {
+                            challengedCategoryInfo[c.targetCategoryKey] = definition.badge;
+                        }
                     }
                 });
             }
@@ -517,15 +638,23 @@
             let sortedItems = Object.entries(state.budgetedItems).map(([key, cat], index) => { if (cat.order === undefined) { cat.order = index; updates[`/budgetedItems/${key}/order`] = index; } return [key, cat]; }); if (Object.keys(updates).length > 0) { update(dbRef, updates); } sortedItems.sort((a, b) => a[1].order - b[1].order); const isReordering = selectors.budgetCategoriesList.classList.contains('reordering-active'); 
             
             sortedItems.forEach(([key, item], index) => { 
-                const hasChallenge = challengedCategoryKeys[key];
-                const challengeBadgeHTML = hasChallenge ? `<span class="category-challenge-badge" title="This category has an active challenge!">🏆</span>` : '';
+                const challengeBadge = challengedCategoryInfo[key];
+                const challengeBadgeHTML = challengeBadge ? `<span class="category-challenge-badge" title="This category has an active challenge!">${challengeBadge}</span>` : '';
 
                 const isSavings = item.type === 'savings'; 
                 const parentList = isSavings ? selectors.savingsGoalsList : selectors.budgetCategoriesList; 
                 const itemDiv = document.createElement('div'); 
                 if (item.isEditing) { 
-                    itemDiv.className = 'budget-category'; 
-                    itemDiv.innerHTML = `<div class="edit-category-form"><p><strong>Edit ${isSavings ? 'Goal' : 'Category'}</strong></p><div class="input-group"><input type="text" class="edit-name-input" value="${item.name}"><input type="number" class="edit-limit-input" value="${item.limit.toFixed(2)}" min="0" step="0.01"></div><div style="margin-top: 10px; display: flex; gap: 10px;"><button class="save-edit-btn" data-key="${key}">Save</button><button class="cancel-edit-btn" data-key="${key}" style="background-color: #777;">Cancel</button></div></div>`; 
+                    itemDiv.className = 'budget-category';
+                    let rolloverControlHTML = '';
+                    if (state.features?.rolloverControlEnabled && !isSavings) {
+                        rolloverControlHTML = `
+                            <div class="setting-toggle" style="padding: 5px 0; font-weight: normal;">
+                                <label for="edit-rollover-${key}">Rollover unspent funds</label>
+                                <input type="checkbox" id="edit-rollover-${key}" class="edit-rollover-toggle" ${item.rolloverEnabled ? 'checked' : ''}>
+                            </div>`;
+                    }
+                    itemDiv.innerHTML = `<div class="edit-category-form"><p><strong>Edit ${isSavings ? 'Goal' : 'Category'}</strong></p><div class="input-group"><input type="text" class="edit-name-input" value="${item.name}"><input type="number" class="edit-limit-input" value="${item.limit.toFixed(2)}" min="0" step="0.01"></div>${rolloverControlHTML}<div style="margin-top: 10px; display: flex; gap: 10px;"><button class="save-edit-btn" data-key="${key}">Save</button><button class="cancel-edit-btn" data-key="${key}" style="background-color: #777;">Cancel</button></div></div>`; 
                 } else { 
                     itemDiv.className = `budget-category ${item.collapsed ? 'collapsed' : ''}`; 
                     const totalContributions = toArray(item.expenses).reduce((sum, exp) => sum + exp.amount, 0); 
@@ -554,7 +683,7 @@
         function renderChallenges() {
             renderAvailableChallenges();
             renderActiveChallenges();
-            renderTrophyCase();
+            renderEarnedTrophies();
         }
 
         function renderAvailableChallenges() {
@@ -571,7 +700,7 @@
             selectors.activeChallengesList.innerHTML = '';
             const activeChallenges = state.activeChallenges || {};
             if (Object.keys(activeChallenges).length === 0) {
-                selectors.activeChallengesList.innerHTML = '<p>You have no active or finished challenges this month.</p>';
+                selectors.activeChallengesList.innerHTML = '<p>You have no active challenges this month.</p>';
                 return;
             }
 
@@ -608,11 +737,11 @@
             });
         }
 
-        function renderTrophyCase() {
-            selectors.trophyCaseList.innerHTML = '';
-            const trophies = state.allTimeTrophies || {};
+        function renderEarnedTrophies() {
+            selectors.earnedTrophiesList.innerHTML = '';
+            const trophies = state.earnedTrophies || {};
             if (Object.keys(trophies).length === 0) {
-                selectors.trophyCaseList.innerHTML = '<p>Complete some challenges to earn trophies!</p>';
+                selectors.earnedTrophiesList.innerHTML = '<p>Complete challenges to earn trophies!</p>';
                 return;
             }
             let html = '';
@@ -620,29 +749,78 @@
                 const definition = CHALLENGE_DEFINITIONS[trophy.challengeId];
                  html += `<div class="challenge-item completed"><h4>${definition.badge} ${definition.title} ${trophy.targetCategoryName ? `(${trophy.targetCategoryName})` : ''}</h4><p>Completed: ${trophy.archivedMonth}</p></div>`;
             });
-            selectors.trophyCaseList.innerHTML = html;
+            selectors.earnedTrophiesList.innerHTML = html;
         }
 
         function renderReviewRewards(monthData) {
             const rewardsSection = selectors.reviewRewardsSection;
             const rewardsList = selectors.reviewRewardsList;
             const challengesInHistory = monthData.activeChallenges || {};
-            const completedChallenges = Object.values(challengesInHistory).filter(c => c.status === 'completed');
-
+            
             rewardsList.innerHTML = ''; 
             rewardsSection.style.display = 'block';
 
-            if (completedChallenges.length === 0) {
-                rewardsList.innerHTML = '<p>No challenges were completed this month.</p>';
+            if (Object.keys(challengesInHistory).length === 0) {
+                rewardsList.innerHTML = '<p>No challenges were attempted this month.</p>';
                 return;
             }
 
+            const sortedChallenges = Object.values(challengesInHistory).sort((a, b) => {
+                const statusA = a.status === 'completed' ? 1 : 2;
+                const statusB = b.status === 'completed' ? 1 : 2;
+                return statusA - statusB;
+            });
+
             let html = '';
-            completedChallenges.forEach(challenge => {
+            sortedChallenges.forEach(challenge => {
                 const definition = CHALLENGE_DEFINITIONS[challenge.challengeId];
-                html += `<div class="challenge-item completed"><h4>${definition.badge} ${definition.title} ${challenge.targetCategoryName ? `(${challenge.targetCategoryName})` : ''}</h4></div>`;
+                let itemClass = '';
+                if(challenge.status === 'completed') itemClass = 'completed';
+                if(challenge.status === 'failed') itemClass = 'failed';
+                html += `<div class="challenge-item ${itemClass}"><h4>${definition.badge} ${definition.title} ${challenge.targetCategoryName ? `(${challenge.targetCategoryName})` : ''}</h4></div>`;
             });
             rewardsList.innerHTML = html;
+        }
+
+        function renderReviewExpenseLog(monthData) {
+            const { reviewExpenseLogList, reviewExpenseLogSection } = selectors;
+            reviewExpenseLogList.innerHTML = '';
+            
+            let allExpenses = [];
+            if (monthData.budgetedItems) {
+                for (const category of Object.values(monthData.budgetedItems)) {
+                    if (category.expenses) {
+                        const categoryExpenses = Object.values(category.expenses).map(exp => ({
+                            ...exp,
+                            categoryName: category.name
+                        }));
+                        allExpenses.push(...categoryExpenses);
+                    }
+                }
+            }
+
+            if (allExpenses.length === 0) {
+                reviewExpenseLogSection.style.display = 'none';
+                return;
+            }
+
+            allExpenses.sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            let html = '';
+            allExpenses.forEach(exp => {
+                html += `
+                    <div style="display: flex; justify-content: space-between; padding: 4px 2px; border-bottom: 1px solid #f0f0f0;">
+                        <span style="max-width: 75%; word-break: break-word;">
+                            <strong>${currencyFormatter.format(exp.amount)}</strong> - 
+                            <span style="color: #666; font-style: italic;">${exp.note || 'No note'}</span> 
+                            <em>(${exp.categoryName})</em>
+                        </span>
+                        <span style="color: #888; white-space: nowrap; margin-left: 10px;">${exp.date}</span>
+                    </div>`;
+            });
+            
+            reviewExpenseLogList.innerHTML = html;
+            reviewExpenseLogSection.style.display = 'block';
         }
 
         async function startChallenge(challengeId) {
@@ -689,8 +867,8 @@
 
         function awardTrophy(challengeKey, challengeData) {
             const updates = {};
-            const newTrophyRef = push(ref(db, `budgets/${currentBudgetId}/allTimeTrophies`));
-            updates[`/allTimeTrophies/${newTrophyRef.key}`] = { ...challengeData, status: 'completed', archivedMonth: state.monthYear };
+            const newTrophyRef = push(ref(db, `budgets/${currentBudgetId}/earnedTrophies`));
+            updates[`/earnedTrophies/${newTrophyRef.key}`] = { ...challengeData, status: 'completed', archivedMonth: state.monthYear };
             updates[`/activeChallenges/${challengeKey}`] = null;
             update(dbRef, updates);
         }
@@ -709,7 +887,7 @@
                 if (challenge.challengeId === 'stayUnderBudget' && categoryKey === challenge.targetCategoryKey) {
                     const newTotal = (challenge.currentAmount || 0) + amount;
                     updates[`/activeChallenges/${key}/currentAmount`] = newTotal;
-                    if (newTotal >= challenge.targetAmount) { newStatus = 'failed'; }
+                    if (newTotal > challenge.targetAmount) { newStatus = 'failed'; }
                 }
                 if (challenge.challengeId === 'goalBooster' && categoryKey === challenge.targetCategoryKey) {
                     const newTotal = (challenge.currentAmount || 0) + amount;
@@ -729,8 +907,8 @@
                 }
                 
                 if (newStatus) {
-                    if (newStatus === 'completed') {
-                        awardTrophy(key, challenge); // Award trophy instead of just updating status
+                    if (newStatus === 'completed' && challenge.challengeId !== 'stayUnderBudget') {
+                        awardTrophy(key, challenge);
                     } else {
                         updates[`/activeChallenges/${key}/status`] = newStatus;
                     }
@@ -755,8 +933,21 @@
         selectors.expandAllBtn.addEventListener('click', () => toggleAllCategories(false));
         selectors.collapseAllBtn.addEventListener('click', () => toggleAllCategories(true));
         selectors.reorderToggleBtn.addEventListener('click', () => { const list = selectors.budgetCategoriesList; const isActive = list.classList.toggle('reordering-active'); selectors.reorderToggleBtn.textContent = isActive ? 'Done' : 'Reorder'; renderCategorizedItems(); });
-        selectors.manageAccountsBtn.addEventListener('click', () => { selectors.sharableIdDisplay.value = currentBudgetId; selectors.editAccountNameInput.value = state.accountName || ''; selectors.toggleChallenges.checked = state.challengesEnabled !== false; selectors.accountsModal.style.display = 'flex'; });
-        selectors.toggleChallenges.addEventListener('change', (e) => { set(ref(db, `budgets/${currentBudgetId}/challengesEnabled`), e.target.checked); });
+        
+        selectors.manageAccountsBtn.addEventListener('click', () => { 
+            selectors.sharableIdDisplay.value = currentBudgetId; 
+            selectors.editAccountNameInput.value = state.accountName || ''; 
+            selectors.toggleChallenges.checked = state.challengesEnabled !== false;
+            selectors.toggleRollover.checked = state.features?.rolloverControlEnabled || false;
+            selectors.accountsModal.style.display = 'flex'; 
+        });
+        selectors.toggleChallenges.addEventListener('change', (e) => { 
+            set(ref(db, `budgets/${currentBudgetId}/challengesEnabled`), e.target.checked); 
+        });
+        selectors.toggleRollover.addEventListener('change', (e) => {
+            set(ref(db, `budgets/${currentBudgetId}/features/rolloverControlEnabled`), e.target.checked);
+        });
+
         selectors.saveAccountNameBtn.addEventListener('click', () => { const newName = selectors.editAccountNameInput.value.trim(); if (newName) { set(ref(db, `budgets/${currentBudgetId}/accountName`), newName); selectors.saveAccountNameBtn.textContent = 'Saved!'; setTimeout(() => { selectors.saveAccountNameBtn.textContent = 'Save'; closeModal(selectors.accountsModal); }, 1000); } else { alert('Please enter a valid budget name.'); } });
         selectors.copyIdBtn.addEventListener('click', () => { selectors.sharableIdDisplay.select(); document.execCommand('copy'); selectors.copyIdBtn.textContent = 'Copied!'; setTimeout(() => { selectors.copyIdBtn.textContent = 'Copy'; }, 1500); });
         selectors.leaveBudgetBtn.addEventListener('click', () => { localStorage.removeItem('lastBudgetId'); window.location.reload(); });
@@ -771,6 +962,7 @@
         
         selectors.reviewBtn.addEventListener('click', () => { 
             selectors.reviewRewardsSection.style.display = 'none';
+            selectors.reviewExpenseLogSection.style.display = 'none';
             selectors.monthSelect.innerHTML = ''; 
             if (history.length === 0) { 
                 selectors.chartsArea.style.display = 'none'; 
@@ -791,6 +983,7 @@
             createCashflowChart(selectedMonthData); 
             createSpendingChart(selectedMonthData);
             renderReviewRewards(selectedMonthData);
+            renderReviewExpenseLog(selectedMonthData);
         });
 
         document.body.addEventListener('click', async (e) => {
@@ -832,9 +1025,24 @@
             else if (button.classList.contains('delete-btn')) { if (await showConfirm(`Are you sure you want to delete this item?`)) { if (type === 'income' || type === 'expense') { remove(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}`)); } else if (type === 'category') { remove(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}`)); } } } 
             else if (button.classList.contains('edit-item-btn')) { set(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}/isEditing`), true); }
             else if (button.classList.contains('cancel-item-btn')) { set(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}/isEditing`), false); }
-            else if (button.classList.contains('save-item-btn')) { const form = button.closest('.input-group'); const newName = form.querySelector('.edit-item-name-input').value.trim(); const newAmount = parseFloat(form.querySelector('.edit-item-amount-input').value); if (newName && newAmount > 0) { update(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}`), { name: newName, amount: newAmount, isEditing: false }); } else { alert('Please enter a valid name and amount.'); } }
+            else if (button.classList.contains('save-item-btn')) { const form = button.closest('.input-group'); const newName = form.querySelector('.edit-item-name-input').value.trim(); const newAmount = parseFloat(form.querySelector('.edit-item-amount-input').value); if (newName && newAmount > 0) { update(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}`), { name: newName, amount: newAmount, isEditing: false }); } else { alert('Please enter a valid name and amount.'); } } 
             else if (button.classList.contains('edit-btn')) { if (button.classList.contains('edit-expense-btn')) { set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses/${expenseKey}/isEditing`), true); } else { set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}/isEditing`), true); } } 
-            else if (button.classList.contains('save-edit-btn')) { const form = button.closest('.edit-category-form'); const newName = form.querySelector('.edit-name-input').value.trim(); const newLimit = parseFloat(form.querySelector('.edit-limit-input').value); if (newName && newLimit > 0) { update(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}`), { name: newName, limit: newLimit, isEditing: false }); } else { alert('Please enter a valid name and limit/goal amount.'); } } 
+            else if (button.classList.contains('save-edit-btn')) { 
+                const form = button.closest('.edit-category-form'); 
+                const newName = form.querySelector('.edit-name-input').value.trim(); 
+                const newLimit = parseFloat(form.querySelector('.edit-limit-input').value);
+                const rolloverCheckbox = form.querySelector('.edit-rollover-toggle');
+                
+                if (newName && newLimit > 0) {
+                    const updates = { name: newName, limit: newLimit, isEditing: false };
+                    if(rolloverCheckbox) {
+                        updates.rolloverEnabled = rolloverCheckbox.checked;
+                    }
+                    update(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}`), updates); 
+                } else { 
+                    alert('Please enter a valid name and limit/goal amount.'); 
+                } 
+            } 
             else if (button.classList.contains('save-edit-expense-btn')) { const form = button.closest('li'); const newAmount = parseFloat(form.querySelector('.edit-expense-amount-input').value); const newNote = form.querySelector('.edit-expense-note-input').value.trim(); if (newAmount > 0) { const originalDate = state.budgetedItems[categoryKey].expenses[expenseKey].date; update(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses/${expenseKey}`), { date: originalDate, amount: newAmount, note: newNote, isEditing: false }); } else { alert('Please enter a valid amount.'); } } 
             else if (button.classList.contains('cancel-edit-btn')) { set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}/isEditing`), false); } 
             else if (button.classList.contains('cancel-edit-expense-btn')) { set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses/${expenseKey}/isEditing`), false); }
