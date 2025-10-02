@@ -363,6 +363,37 @@
             }
         };
 
+        /**
+         * Converts a date string (like M/D/YYYY) to a YYYY-MM-DD string for date inputs.
+         * @param {string} dateStr The date string to convert.
+         * @returns {string} The date formatted as YYYY-MM-DD.
+         */
+        function toInputDate(dateStr) {
+            if (!dateStr) return new Date().toISOString().split('T')[0];
+            try {
+                // Attempt to create a date object. Handles many formats but can be unreliable across browsers for MM/DD/YYYY.
+                const date = new Date(dateStr);
+                // Check if the date is valid.
+                if (isNaN(date.getTime())) {
+                    // If parsing fails, try a manual parse for MM/DD/YYYY.
+                    const parts = dateStr.split('/');
+                    if (parts.length === 3) {
+                        const [month, day, year] = parts;
+                        // new Date(year, monthIndex, day)
+                        const formattedDate = new Date(year, month - 1, day);
+                        return formattedDate.toISOString().split('T')[0];
+                    }
+                    // Fallback to today if manual parse also fails.
+                    return new Date().toISOString().split('T')[0];
+                }
+                // If the initial parse was successful, format it.
+                return date.toISOString().split('T')[0];
+            } catch (e) {
+                // Fallback to today in case of any other errors.
+                return new Date().toISOString().split('T')[0];
+            }
+        }
+
         function createNewBudget() { return { accountName: 'My Shared Budget', income: {}, monthlyExpenses: {}, budgetedItems: {}, monthYear: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }), incomeSectionCollapsed: false, allocationSectionCollapsed: false, history: {}, activeChallenges: {}, earnedTrophies: {}, challengesEnabled: true, features: { rolloverControlEnabled: false } }; }
         function startNewBudget() { const newBudgetRef = push(ref(db, 'budgets')); const newBudgetId = newBudgetRef.key; set(newBudgetRef, createNewBudget()); connectToBudget(newBudgetId); }
         async function joinBudget() { const budgetId = selectors.joinBudgetIdInput.value.trim(); if (!budgetId) { alert('Please enter a budget ID.'); return; } const budgetRef = ref(db, `budgets/${budgetId}`); const snapshot = await get(budgetRef); if (snapshot.exists()) { connectToBudget(budgetId); } else { alert('Budget ID not found. Please check the ID and try again.'); } }
@@ -687,7 +718,7 @@
                         barColor = getColorForPercentage(progressPercent); 
                         summaryText = `${currencyFormatter.format(totalContributions)} spent of ${currencyFormatter.format(item.limit)}`; 
                     } 
-                    const expenseLogsHTML = item.expenses ? Object.entries(item.expenses).map(([expKey, exp]) => { if (exp.isEditing) { return `<li class="edit-expense-form"><div class="input-group"><input type="number" class="edit-expense-amount-input" value="${exp.amount.toFixed(2)}"><input type="text" class="edit-expense-note-input" value="${exp.note || ''}"></div><div style="margin-top:5px; display:flex; gap:5px;"><button class="save-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">Save</button><button class="cancel-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}" style="background-color:#777">Cancel</button></div></li>`; } return `<li><span class="amount">${currencyFormatter.format(exp.amount)}</span><span class="note">${exp.note}</span><span class="date-stamp">${exp.date || ''}</span><div style="display:flex; gap:5px;"><button class="icon-btn edit-btn edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">✏️</button><button class="icon-btn delete-btn delete-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">✖</button></div></li>`; }).join('') : ''; 
+                    const expenseLogsHTML = item.expenses ? Object.entries(item.expenses).map(([expKey, exp]) => { if (exp.isEditing) { return `<li class="edit-expense-form"><div class="input-group"><input type="number" class="edit-expense-amount-input" value="${exp.amount.toFixed(2)}"><input type="text" class="edit-expense-note-input" placeholder="Note" value="${exp.note || ''}"><input type="date" class="edit-expense-date-input" value="${toInputDate(exp.date)}"></div><div style="margin-top:5px; display:flex; gap:5px;"><button class="save-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">Save</button><button class="cancel-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}" style="background-color:#777">Cancel</button></div></li>`; } return `<li><span class="amount">${currencyFormatter.format(exp.amount)}</span><span class="note">${exp.note}</span><span class="date-stamp">${exp.date || ''}</span><div style="display:flex; gap:5px;"><button class="icon-btn edit-btn edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">✏️</button><button class="icon-btn delete-btn delete-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">✖</button></div></li>`; }).join('') : ''; 
                     const reorderControlsHTML = isSavings ? '' : `<span class="reorder-controls"><button class="move-btn move-up-btn" data-key="${key}" ${index === 0 ? 'disabled' : ''}>🔼</button><button class="move-btn move-down-btn" data-key="${key}" ${index === sortedItems.length - 1 ? 'disabled' : ''}>🔽</button></span>`; 
                     itemDiv.innerHTML = `<div class="budget-category-header" data-key="${key}"><span style="display: flex; align-items: center;">${challengeBadgeHTML}${reorderControlsHTML}${item.name}</span><div style="display: flex; align-items: center; gap: 5px;"><button class="icon-btn edit-btn" data-key="${key}">✏️</button><button class="icon-btn delete-btn" data-key="${key}" data-type="category">✖</button><span class="toggle-icon" style="margin-left: 15px;">▼</span></div></div><div class="budget-summary-text">${summaryText}</div><div class="progress-bar"><div class="progress-bar-inner" style="width: ${isSavings ? progressPercent : progressPercent}%; background-color: ${barColor};"></div>${!isSavings ? `<div class="progress-bar-inner progress-bar-overspent" style="width: ${overspentPercent}%;"></div>` : ''}</div><div class="budget-category-content"><div class="new-expense-form"><div class="input-group"><input type="number" placeholder="Amount" class="expense-amount-input" min="0" step="0.01"><input type="text" placeholder="Note (optional)" class="expense-note-input"><button class="add-expense-to-category-btn">${isSavings ? 'Add Contribution' : 'Add Expense'}</button></div></div><ul class="expense-log">${expenseLogsHTML}</ul></div>`; 
                 } 
@@ -1151,7 +1182,19 @@
                     alert('Please enter a valid name and limit/goal amount.'); 
                 } 
             } 
-            else if (button.classList.contains('save-edit-expense-btn')) { const form = button.closest('li'); const newAmount = parseFloat(form.querySelector('.edit-expense-amount-input').value); const newNote = form.querySelector('.edit-expense-note-input').value.trim(); if (newAmount > 0) { const originalDate = state.budgetedItems[categoryKey].expenses[expenseKey].date; update(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses/${expenseKey}`), { date: originalDate, amount: newAmount, note: newNote, isEditing: false }); } else { alert('Please enter a valid amount.'); } } 
+            else if (button.classList.contains('save-edit-expense-btn')) { 
+                const form = button.closest('li'); 
+                const newAmount = parseFloat(form.querySelector('.edit-expense-amount-input').value); 
+                const newNote = form.querySelector('.edit-expense-note-input').value.trim();
+                const dateValue = form.querySelector('.edit-expense-date-input').value; // YYYY-MM-DD format
+                if (newAmount > 0 && dateValue) { 
+                    // The date from the input is UTC. Add T00:00:00 to avoid timezone issues converting it to a local string.
+                    const newDate = new Date(dateValue + 'T00:00:00').toLocaleDateString();
+                    update(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses/${expenseKey}`), { date: newDate, amount: newAmount, note: newNote, isEditing: false }); 
+                } else { 
+                    alert('Please enter a valid amount and select a date.'); 
+                } 
+            } 
             else if (button.classList.contains('cancel-edit-btn')) { set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}/isEditing`), false); } 
             else if (button.classList.contains('cancel-edit-expense-btn')) { set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses/${expenseKey}/isEditing`), false); }
         });
