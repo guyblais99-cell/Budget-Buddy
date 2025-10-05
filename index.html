@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <link rel="icon" type="image/png" href="/bb.png">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Budget Buddy</title>
+    <title>Budgety Buddy</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -34,11 +35,14 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: bold;
-            font-size: 1.1em;
+            font-family: 'Cambria', 'Times New Roman', Times, serif;
+            font-style: italic;
+            font-weight: 700;
+            font-size: 1.15em;
         }
-        header { text-align: center; border-bottom: 2px solid var(--border-color); padding-bottom: 20px; margin-bottom: 20px; }
-        h1 { color: var(--accent-color); margin: 0; }
+        header { text-align: center; padding: 28px 20px 18px; margin-bottom: 20px; background: linear-gradient(135deg, var(--accent-color), var(--accent-hover)); color: white; border-radius: 8px; position: relative; }
+    h1 { color: white; margin: 0; font-family: 'Cambria', 'Times New Roman', Times, serif; font-style: italic; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,0.18); }
+    #current-account-name { color: rgba(255,255,255,0.95); }
         #current-account-name {
             font-size: 1.6em;
             margin: 10px 0 0 0;
@@ -66,10 +70,10 @@
         .add-category-btn { width: 100%; margin-top: 10px; background-color: #f0f0f0; color: var(--text-color); }
         .category-controls { display: flex; gap: 5px; }
         .control-btn { font-size: 0.8em; padding: 5px 10px; background-color: #e9e9e9; color: var(--text-color); }
+        /* moved settings button from top-right to under the month */
         #manage-accounts-btn {
-            position: absolute;
-            top: 25px;
-            right: 25px;
+            display: inline-block;
+            margin-top: 8px;
         }
         .budget-category { border: 1px solid var(--border-color); border-radius: 5px; padding: 10px; background-color: #fafafa; margin-bottom: 10px; }
         .budget-category:last-child { margin-bottom: 0; }
@@ -141,7 +145,8 @@
 
         @media (max-width: 600px) { 
             .chart-container { grid-template-columns: 1fr; } 
-            #manage-accounts-btn { top: 15px; right: 15px; }
+            /* ensure settings button flows under the month on small screens */
+            #manage-accounts-btn { position: static; margin-top: 8px; }
             #app-logo { top: 15px; left: 15px; }
         }
     </style>
@@ -149,13 +154,15 @@
 <body>
     <div class="container app-content">
         <div id="app-logo">BB</div>
-        <button id="manage-accounts-btn" class="control-btn">Settings & Share</button>
         <header>
-            <h1>Budget Buddy</h1>
+            <h1>Budgety Buddy</h1>
             <div>
                 <h2 id="current-account-name" style="display: inline-block; margin: 10px 0 0 0;"></h2>
             </div>
             <p id="current-month" style="margin-top: 10px;"></p>
+            <div style="text-align:center;">
+                <button id="manage-accounts-btn" class="control-btn">Settings & Share</button>
+            </div>
         </header>
         <button id="review-btn" style="width: 100%; margin-bottom: 10px;">📊 Monthly Review</button>
         <button id="challenge-center-btn" style="width: 100%; margin-bottom: 20px;">
@@ -209,7 +216,7 @@
         </div>
     </div>
 
-    <div class="modal-overlay" id="onboarding-modal"><div class="modal-content"><div class="modal-header"><h2>Welcome to Budget Buddy</h2></div><p>Create a new budget to share, or join one using an ID from a friend.</p><button id="create-new-budget-btn" style="width: 100%; margin-bottom: 15px;">Create a New Shared Budget</button><hr><p style="margin-top: 15px;"><strong>Or Join Existing Budget</strong></p><div class="input-group"><input type="text" id="join-budget-id-input" placeholder="Enter Sharable ID"><button id="join-budget-btn">Join</button></div></div></div>
+    <div class="modal-overlay" id="onboarding-modal"><div class="modal-content"><div class="modal-header"><h2>Welcome to Budgety Buddy</h2></div><p>Create a new budget to share, or join one using an ID from a friend.</p><button id="create-new-budget-btn" style="width: 100%; margin-bottom: 15px;">Create a New Shared Budget</button><hr><p style="margin-top: 15px;"><strong>Or Join Existing Budget</strong></p><div class="input-group"><input type="text" id="join-budget-id-input" placeholder="Enter Sharable ID"><button id="join-budget-btn">Join</button></div></div></div>
     <div class="modal-overlay" id="review-modal"><div class="modal-content"><div class="modal-header"><h2>Monthly Review</h2><button class="close-btn" id="close-review-modal-btn">&times;</button></div>
         <div id="review-content">
             <div id="review-tabs">
@@ -713,10 +720,24 @@
                         barColor = 'var(--income-color)'; 
                         summaryText = `${currencyFormatter.format(totalContributions)} saved of ${currencyFormatter.format(item.limit)} goal`; 
                     } else { 
-                        progressPercent = item.limit > 0 ? Math.max(0, 100 * (item.limit - totalContributions) / item.limit) : 100; 
-                        overspentPercent = item.limit > 0 ? Math.max(0, 100 * (totalContributions - item.limit) / item.limit) : 0; 
-                        barColor = getColorForPercentage(progressPercent); 
-                        summaryText = `${currencyFormatter.format(totalContributions)} spent of ${currencyFormatter.format(item.limit)}`; 
+                        // Show amount left of the budgeted amount (allow negative when overspent)
+                        const amountLeft = (item.limit - totalContributions); 
+                        summaryText = `${currencyFormatter.format(amountLeft)} left of ${currencyFormatter.format(item.limit)}`; 
+
+                        if (item.limit > 0) {
+                            if (totalContributions <= item.limit) {
+                                // percent remaining for bar visual (0..100)
+                                progressPercent = Math.max(0, 100 * (amountLeft / item.limit));
+                                overspentPercent = 0;
+                            } else {
+                                // over budget: no remaining percent, show overspent percent (capped at 200% for visibility)
+                                progressPercent = 0;
+                                overspentPercent = Math.min(200, 100 * ((totalContributions - item.limit) / item.limit));
+                            }
+                        } else {
+                            progressPercent = 100;
+                        }
+                        barColor = getColorForPercentage(progressPercent);
                     } 
                     const expenseLogsHTML = item.expenses ? Object.entries(item.expenses).map(([expKey, exp]) => { if (exp.isEditing) { return `<li class="edit-expense-form"><div class="input-group"><input type="number" class="edit-expense-amount-input" value="${exp.amount.toFixed(2)}"><input type="text" class="edit-expense-note-input" placeholder="Note" value="${exp.note || ''}"><input type="date" class="edit-expense-date-input" value="${toInputDate(exp.date)}"></div><div style="margin-top:5px; display:flex; gap:5px;"><button class="save-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">Save</button><button class="cancel-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}" style="background-color:#777">Cancel</button></div></li>`; } return `<li><span class="amount">${currencyFormatter.format(exp.amount)}</span><span class="note">${exp.note}</span><span class="date-stamp">${exp.date || ''}</span><div style="display:flex; gap:5px;"><button class="icon-btn edit-btn edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">✏️</button><button class="icon-btn delete-btn delete-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">✖</button></div></li>`; }).join('') : ''; 
                     const reorderControlsHTML = isSavings ? '' : `<span class="reorder-controls"><button class="move-btn move-up-btn" data-key="${key}" ${index === 0 ? 'disabled' : ''}>🔼</button><button class="move-btn move-down-btn" data-key="${key}" ${index === sortedItems.length - 1 ? 'disabled' : ''}>🔽</button></span>`; 
@@ -725,7 +746,7 @@
                 parentList.appendChild(itemDiv); 
             }); 
         }
-        function renderHeader() { const accountName = state.accountName || `Shared Budget`; document.title = `Budget Buddy - ${accountName}`; selectors.currentAccountName.textContent = accountName; selectors.currentMonth.textContent = state.monthYear; }
+    function renderHeader() { const accountName = state.accountName || `Shared Budget`; document.title = `Budgety Buddy - ${accountName}`; selectors.currentAccountName.textContent = accountName; selectors.currentMonth.textContent = state.monthYear; }
         function createCashflowChart(monthData) { if(cashflowChartInstance) cashflowChartInstance.destroy(); const totalIncome = calculateTotalIncome(monthData); const totalSpending = calculateTotalMonthlyExpenses(monthData) + calculateTotalBudgetedSpending(monthData) + calculateTotalContributions(monthData); const ctx = document.getElementById('cashflow-chart').getContext('2d'); cashflowChartInstance = new Chart(ctx, { type: 'bar', data: { labels: ['Total Income', 'Total Outgoing'], datasets: [{ label: 'Amount', data: [totalIncome, totalSpending], backgroundColor: ['rgba(46, 204, 113, 0.7)', 'rgba(231, 76, 60, 0.7)'], borderColor: ['#2ecc71', '#e74c3c'], borderWidth: 1 }] }, options: { scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } } }); }
         function createSpendingChart(monthData) { if(spendingChartInstance) spendingChartInstance.destroy(); const categorySpending = getItemsByType(monthData, 'budget').map(cat => ({ name: cat.name, total: toArray(cat.expenses).reduce((sum, exp) => sum + exp.amount, 0) })).filter(c => c.total > 0); const ctx = document.getElementById('spending-chart').getContext('2d'); spendingChartInstance = new Chart(ctx, { type: 'pie', data: { labels: categorySpending.map(c => c.name), datasets: [{ data: categorySpending.map(c => c.total), borderWidth: 1 }] }, options: { plugins: { legend: { position: 'bottom' } } } }); }
         function createComparisonCashflowChart(month1, month2) { if(comparisonCashflowChart) comparisonCashflowChart.destroy(); const totalIncome1 = calculateTotalIncome(month1); const totalOutgoing1 = calculateTotalMonthlyExpenses(month1) + calculateTotalBudgetedSpending(month1) + calculateTotalContributions(month1); const totalIncome2 = calculateTotalIncome(month2); const totalOutgoing2 = calculateTotalMonthlyExpenses(month2) + calculateTotalBudgetedSpending(month2) + calculateTotalContributions(month2); const ctx = document.getElementById('comparison-cashflow-chart').getContext('2d'); comparisonCashflowChart = new Chart(ctx, { type: 'bar', data: { labels: ['Total Income', 'Total Outgoing'], datasets: [ { label: month1.monthYear, data: [totalIncome1, totalOutgoing1], backgroundColor: 'rgba(74, 144, 226, 0.7)', }, { label: month2.monthYear, data: [totalIncome2, totalOutgoing2], backgroundColor: 'rgba(126, 211, 33, 0.7)', } ] } }); }
@@ -1203,4 +1224,5 @@
         if (lastBudgetId) { connectToBudget(lastBudgetId); }
     </script>
 </body>
+
 </html>
