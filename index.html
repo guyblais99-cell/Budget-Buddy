@@ -212,6 +212,7 @@
             <br>
             <span id="active-challenge-counter" style="display: none; font-size: 0.8em; font-weight: normal;"></span>
         </button>
+        <button id="no-spend-today-btn" style="width: 100%; margin-bottom: 20px; display: none; background-color: var(--income-color);">✅ I Didn't Spend Today!</button>
         
         <div class="section" id="income-expenses-section">
             <div class="section-header"><h3>💰 Income & Fixed Expenses</h3><div class="toggle-icon">▼</div></div>
@@ -275,7 +276,7 @@
              <div class="section-header"><h3>🏦 Savings Goals</h3></div>
             <div class="section-content" id="savings-goals-list"></div>
             <button class="add-category-btn" id="add-savings-goal-btn">+ New Savings Goal</button>
-            <div class="hidden-form" id="new-savings-goal-form"><div class="input-group"><input type="text" id="savings-goal-name-input" placeholder="Goal Name (e.g., Vacation)"><input type="number" id="savings-goal-amount-input" placeholder="Goal Amount" min="0" step="0.01"><button id="save-savings-goal-btn">Save Goal</button></div></div>
+            <div class="hidden-form" id="new-savings-goal-form" style="display: none;"><div class="input-group"><input type="text" id="savings-goal-name-input" placeholder="Goal Name (e.g., Vacation)"><input type="number" id="savings-goal-amount-input" placeholder="Goal Amount" min="0" step="0.01"><button id="save-savings-goal-btn">Save Goal</button></div></div>
         </div>
     </div>
 
@@ -360,6 +361,7 @@
         let dbRef = null;
         let history = [];
         let cashflowChartInstance, spendingChartInstance, comparisonCashflowChart, comparisonSpendingChart;
+        let isFirstLoad = true; 
 
         const selectors = {
             appContent: document.querySelector('.app-content'),
@@ -368,7 +370,6 @@
             expenseList: document.getElementById('expense-list'), expenseNameInput: document.getElementById('expense-name-input'), expenseAmountInput: document.getElementById('expense-amount-input'), addExpenseBtn: document.getElementById('add-expense-btn'), 
             budgetCategoriesList: document.getElementById('budget-categories-list'), addCategoryBtn: document.getElementById('add-category-btn'), newCategoryForm: document.getElementById('new-category-form'), categoryNameInput: document.getElementById('category-name-input'), categoryLimitInput: document.getElementById('category-limit-input'), saveCategoryBtn: document.getElementById('save-category-btn'), 
             
-            // Sinking Fund Selectors
             sinkingFundToggle: document.getElementById('sinking-fund-toggle'),
             sinkingFundInputs: document.getElementById('sinking-fund-inputs'),
             sinkingFundGoalInput: document.getElementById('sinking-fund-goal-input'),
@@ -414,6 +415,7 @@
             comparisonChartsArea: document.getElementById('comparison-charts-area'),
             reviewExpenseLogSection: document.getElementById('review-expense-log-section'),
             reviewExpenseLogList: document.getElementById('review-expense-log-list'),
+            noSpendTodayBtn: document.getElementById('no-spend-today-btn'),
         };
 
         const currencyFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
@@ -449,45 +451,35 @@
             }
         };
 
-        /**
-         * Converts a date string (like M/D/YYYY) to a YYYY-MM-DD string for date inputs.
-         * @param {string} dateStr The date string to convert.
-         * @returns {string} The date formatted as YYYY-MM-DD.
-         */
         function toInputDate(dateStr) {
             if (!dateStr) return new Date().toISOString().split('T')[0];
             try {
-                // Attempt to create a date object. Handles many formats but can be unreliable across browsers for MM/DD/YYYY.
                 const date = new Date(dateStr);
-                // Check if the date is valid.
                 if (isNaN(date.getTime())) {
-                    // If parsing fails, try a manual parse for MM/DD/YYYY.
                     const parts = dateStr.split('/');
                     if (parts.length === 3) {
                         const [month, day, year] = parts;
-                        // new Date(year, monthIndex, day)
                         const formattedDate = new Date(year, month - 1, day);
                         return formattedDate.toISOString().split('T')[0];
                     }
-                    // Fallback to today if manual parse also fails.
                     return new Date().toISOString().split('T')[0];
                 }
-                // If the initial parse was successful, format it.
                 return date.toISOString().split('T')[0];
             } catch (e) {
-                // Fallback to today in case of any other errors.
                 return new Date().toISOString().split('T')[0];
             }
         }
-
-        function createNewBudget() { return { accountName: 'My Shared Budget', income: {}, monthlyExpenses: {}, budgetedItems: {}, monthYear: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }), incomeSectionCollapsed: false, allocationSectionCollapsed: false, history: {}, activeChallenges: {}, earnedTrophies: {}, challengesEnabled: true, features: { rolloverControlEnabled: false } }; }
+        
+        function createNewBudget() { return { accountName: 'My Shared Budget', income: {}, monthlyExpenses: {}, budgetedItems: {}, monthYear: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }), incomeSectionCollapsed: true, allocationSectionCollapsed: true, history: {}, activeChallenges: {}, earnedTrophies: {}, challengesEnabled: true, features: { rolloverControlEnabled: false } }; }
         function startNewBudget() { const newBudgetRef = push(ref(db, 'budgets')); const newBudgetId = newBudgetRef.key; set(newBudgetRef, createNewBudget()); connectToBudget(newBudgetId); }
         async function joinBudget() { const budgetId = selectors.joinBudgetIdInput.value.trim(); if (!budgetId) { alert('Please enter a budget ID.'); return; } const budgetRef = ref(db, `budgets/${budgetId}`); const snapshot = await get(budgetRef); if (snapshot.exists()) { connectToBudget(budgetId); } else { alert('Budget ID not found. Please check the ID and try again.'); } }
         
         function connectToBudget(budgetId) {
             currentBudgetId = budgetId;
             dbRef = ref(db, `budgets/${currentBudgetId}`);
-            onValue(dbRef, async (snapshot) => { // Make the listener async
+            isFirstLoad = true; 
+
+            onValue(dbRef, async (snapshot) => { 
                 const data = snapshot.val(); 
                 if (data) { 
                     state = data; 
@@ -495,6 +487,18 @@
                     const monthChanged = await checkForNewMonth();
                     if (monthChanged) {
                         return;
+                    }
+
+                    // FIX: This logic is now corrected to not block rendering
+                    if (isFirstLoad) {
+                        state.incomeSectionCollapsed = true;
+                        state.allocationSectionCollapsed = true;
+                        if (state.budgetedItems) {
+                            for (const key in state.budgetedItems) {
+                                state.budgetedItems[key].collapsed = true;
+                            }
+                        }
+                        isFirstLoad = false;
                     }
 
                     updateDailyChallenges();
@@ -552,7 +556,6 @@
                     const totalSpent = (item.expenses ? Object.values(item.expenses) : []).reduce((sum, exp) => sum + exp.amount, 0);
                     const unspent = item.limit - totalSpent;
                     let newLimit = item.limit;
-                    // Sinking funds automatically have rollover enabled, this logic handles both
                     if (item.type !== 'savings' && item.rolloverEnabled && unspent > 0) {
                         newLimit = item.limit + unspent;
                     }
@@ -691,6 +694,19 @@
 
             const challengesEnabled = state.challengesEnabled !== false;
             selectors.challengeCenterBtn.style.display = challengesEnabled ? 'block' : 'none';
+            
+            let expenseLoggerChallengeActive = false;
+            if (state.activeChallenges && challengesEnabled) {
+                const todayStr = new Date().toISOString().split('T')[0];
+                for (const key in state.activeChallenges) {
+                    const challenge = state.activeChallenges[key];
+                    if (challenge.challengeId === 'expenseLogger' && challenge.status === 'active' && challenge.lastLogDate !== todayStr) {
+                        expenseLoggerChallengeActive = true;
+                        break;
+                    }
+                }
+            }
+            selectors.noSpendTodayBtn.style.display = expenseLoggerChallengeActive ? 'block' : 'none';
 
             const incomeAfterBills = calculateIncomeAfterBills(state);
             selectors.remainingToSpend.textContent = currencyFormatter.format(incomeAfterBills - calculateTotalBudgetedSpending(state) - calculateTotalContributions(state));
@@ -787,7 +803,7 @@
                 if (item.isEditing) { 
                     itemDiv.className = 'budget-category';
                     let rolloverControlHTML = '';
-                    if (!isSavings && !isSinkingFund) { // Sinking funds auto-rollover, so no toggle needed
+                    if (!isSavings && !isSinkingFund) {
                         rolloverControlHTML = `
                             <div class="setting-toggle" style="padding: 5px 0; font-weight: normal;">
                                 <label for="edit-rollover-${key}">Rollover unspent funds
@@ -809,17 +825,14 @@
                         barColor = 'var(--income-color)'; 
                         summaryText = `${currencyFormatter.format(totalContributions)} saved of ${currencyFormatter.format(item.limit)} goal`; 
                     } else { 
-                        // Show amount left of the budgeted amount (allow negative when overspent)
                         const amountLeft = (item.limit - totalContributions); 
                         summaryText = `${currencyFormatter.format(amountLeft)} left of ${currencyFormatter.format(item.limit)}`; 
 
                         if (item.limit > 0) {
                             if (totalContributions <= item.limit) {
-                                // percent remaining for bar visual (0..100)
                                 progressPercent = Math.max(0, 100 * (amountLeft / item.limit));
                                 overspentPercent = 0;
                             } else {
-                                // over budget: no remaining percent, show overspent percent (capped at 200% for visibility)
                                 progressPercent = 0;
                                 overspentPercent = Math.min(200, 100 * ((totalContributions - item.limit) / item.limit));
                             }
@@ -1034,7 +1047,9 @@
             if (challengeId === 'expenseLogger') {
                 newChallenge.targetDays = definition.config.days;
                 newChallenge.currentStreak = 0;
-                newChallenge.lastLogDate = new Date().toISOString().split('T')[0]; 
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                newChallenge.lastLogDate = yesterday.toISOString().split('T')[0];
             } else if (challengeId === 'noSpend') {
                 newChallenge.lastLogDate = new Date().toISOString().split('T')[0];
             }
@@ -1149,9 +1164,49 @@
             if (Object.keys(updates).length > 0) { update(dbRef, updates); }
         }
         
+        async function logNoSpendDay() {
+            if (!state.activeChallenges) return;
+            const todayStr = new Date().toISOString().split('T')[0];
+            let challengeKey = null;
+            let challenge = null;
+
+            for (const key in state.activeChallenges) {
+                const currentChallenge = state.activeChallenges[key];
+                if (currentChallenge.challengeId === 'expenseLogger' && currentChallenge.status === 'active') {
+                    challengeKey = key;
+                    challenge = currentChallenge;
+                    break;
+                }
+            }
+
+            if (!challengeKey || !challenge) return;
+
+            const newStreak = (challenge.currentStreak || 0) + 1;
+            
+            selectors.noSpendTodayBtn.disabled = true;
+            selectors.noSpendTodayBtn.textContent = 'Checked In!';
+
+            if (newStreak >= challenge.targetDays) {
+                awardTrophy(challengeKey, challenge);
+                showChallengeAlert(`Congratulations! You completed the "Expense Logger" challenge!`);
+            } else {
+                const updates = {};
+                updates[`/activeChallenges/${challengeKey}/currentStreak`] = newStreak;
+                updates[`/activeChallenges/${challengeKey}/lastLogDate`] = todayStr;
+                await update(dbRef, updates);
+            }
+
+            setTimeout(() => {
+                selectors.noSpendTodayBtn.disabled = false;
+                selectors.noSpendTodayBtn.textContent = '✅ I Didn\'t Spend Today!';
+            }, 1500);
+        }
+
         // --- EVENT LISTENERS ---
         selectors.createNewBudgetBtn.addEventListener('click', startNewBudget);
         selectors.joinBudgetBtn.addEventListener('click', joinBudget);
+        selectors.noSpendTodayBtn.addEventListener('click', logNoSpendDay); 
+
         selectors.reviewTabs.addEventListener('click', (e) => {
             const btn = e.target.closest('.tab-btn');
             if (!btn) return;
@@ -1187,7 +1242,6 @@
         
         selectors.sinkingFundToggle.addEventListener('change', (e) => {
             const isChecked = e.target.checked;
-            // When sinking fund is checked, hide the standard limit input, and show the goal/months inputs.
             selectors.categoryLimitInput.style.display = isChecked ? 'none' : 'flex';
             selectors.sinkingFundInputs.style.display = isChecked ? 'block' : 'none';
         });
@@ -1212,7 +1266,7 @@
                         name: name,
                         limit: monthlyLimit,
                         isSinkingFund: true,
-                        rolloverEnabled: true, // Sinking funds always rollover
+                        rolloverEnabled: true, 
                         sinkingFundData: {
                             totalGoal: totalGoal,
                             totalMonths: totalMonths,
@@ -1225,7 +1279,7 @@
                 }
             } else {
                 const limit = parseFloat(selectors.categoryLimitInput.value);
-                if (limit >= 0) { // Allow 0 for limit
+                if (limit >= 0) { 
                     newCategoryData = { name, limit, rolloverEnabled: false };
                 } else {
                     alert('Please enter a valid monthly budget limit.');
@@ -1237,7 +1291,7 @@
             const finalData = { 
                 ...newCategoryData,
                 expenses: {}, 
-                collapsed: false, 
+                collapsed: true, 
                 isEditing: false, 
                 order: newOrder, 
                 type: 'budget' 
@@ -1245,7 +1299,6 @@
             
             push(ref(db, `budgets/${currentBudgetId}/budgetedItems`), finalData); 
             
-            // Reset form
             selectors.categoryNameInput.value = ''; 
             selectors.categoryLimitInput.value = ''; 
             selectors.sinkingFundGoalInput.value = '';
@@ -1256,7 +1309,7 @@
         });
 
         selectors.addSavingsGoalBtn.addEventListener('click', () => { selectors.newSavingsGoalForm.style.display = 'block'; selectors.savingsGoalNameInput.focus(); });
-        selectors.saveSavingsGoalBtn.addEventListener('click', () => { const name = selectors.savingsGoalNameInput.value.trim(); const limit = parseFloat(selectors.savingsGoalAmountInput.value); if (name && limit > 0) { const newOrder = state.budgetedItems ? Object.keys(state.budgetedItems).length : 0; push(ref(db, `budgets/${currentBudgetId}/budgetedItems`), { name, limit, expenses: {}, collapsed: false, isEditing: false, order: newOrder, type: 'savings' }); selectors.savingsGoalNameInput.value = ''; selectors.savingsGoalAmountInput.value = ''; selectors.newSavingsGoalForm.style.display = 'none'; } else { alert('Please enter a valid goal name and amount.'); } });
+        selectors.saveSavingsGoalBtn.addEventListener('click', () => { const name = selectors.savingsGoalNameInput.value.trim(); const limit = parseFloat(selectors.savingsGoalAmountInput.value); if (name && limit > 0) { const newOrder = state.budgetedItems ? Object.keys(state.budgetedItems).length : 0; push(ref(db, `budgets/${currentBudgetId}/budgetedItems`), { name, limit, expenses: {}, collapsed: true, isEditing: false, order: newOrder, type: 'savings' }); selectors.savingsGoalNameInput.value = ''; selectors.savingsGoalAmountInput.value = ''; selectors.newSavingsGoalForm.style.display = 'none'; } else { alert('Please enter a valid goal name and amount.'); } });
         selectors.incomeExpensesSection.querySelector('.section-header').addEventListener('click', (e) => { if (!e.target.closest('.icon-btn')) { set(ref(db, `budgets/${currentBudgetId}/incomeSectionCollapsed`), !state.incomeSectionCollapsed); } });
         selectors.allocationSection.querySelector('.section-header').addEventListener('click', (e) => { if (!e.target.closest('.icon-btn')) { set(ref(db, `budgets/${currentBudgetId}/allocationSectionCollapsed`), !state.allocationSectionCollapsed); } });
         function toggleAllCategories(isCollapsed) { if (!state.budgetedItems) return; const updates = {}; Object.keys(state.budgetedItems).forEach(key => { if (state.budgetedItems[key].type !== 'savings') updates[`/budgetedItems/${key}/collapsed`] = isCollapsed; }); update(dbRef, updates); }
@@ -1359,7 +1412,7 @@
                 const newLimit = parseFloat(form.querySelector('.edit-limit-input').value);
                 const rolloverCheckbox = form.querySelector('.edit-rollover-toggle');
                 
-                if (newName && newLimit >= 0) { // Allow 0
+                if (newName && newLimit >= 0) {
                     const updates = { name: newName, limit: newLimit, isEditing: false };
                     if(rolloverCheckbox) {
                         updates.rolloverEnabled = rolloverCheckbox.checked;
@@ -1373,9 +1426,8 @@
                 const form = button.closest('li'); 
                 const newAmount = parseFloat(form.querySelector('.edit-expense-amount-input').value); 
                 const newNote = form.querySelector('.edit-expense-note-input').value.trim();
-                const dateValue = form.querySelector('.edit-expense-date-input').value; // YYYY-MM-DD format
+                const dateValue = form.querySelector('.edit-expense-date-input').value;
                 if (newAmount > 0 && dateValue) { 
-                    // The date from the input is UTC. Add T00:00:00 to avoid timezone issues converting it to a local string.
                     const newDate = new Date(dateValue + 'T00:00:00').toLocaleDateString();
                     update(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses/${expenseKey}`), { date: newDate, amount: newAmount, note: newNote, isEditing: false }); 
                 } else { 
