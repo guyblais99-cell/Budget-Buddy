@@ -489,17 +489,41 @@
                         return;
                     }
 
-                    // FIX: This logic is now corrected to not block rendering
+                    // --- START: FIXED CODE ---
                     if (isFirstLoad) {
-                        state.incomeSectionCollapsed = true;
-                        state.allocationSectionCollapsed = true;
+                        isFirstLoad = false; // Set this first to prevent re-running this block
+                        
+                        const updates = {};
+                        let needsUpdate = false;
+
+                        // Check if main sections are already collapsed
+                        if (state.incomeSectionCollapsed !== true) {
+                            updates['/incomeSectionCollapsed'] = true;
+                            needsUpdate = true;
+                        }
+                        if (state.allocationSectionCollapsed !== true) {
+                            updates['/allocationSectionCollapsed'] = true;
+                            needsUpdate = true;
+                        }
+
+                        // Check if any individual categories are not collapsed
                         if (state.budgetedItems) {
                             for (const key in state.budgetedItems) {
-                                state.budgetedItems[key].collapsed = true;
+                                if (state.budgetedItems[key].collapsed !== true) {
+                                    updates[`/budgetedItems/${key}/collapsed`] = true;
+                                    needsUpdate = true;
+                                }
                             }
                         }
-                        isFirstLoad = false;
+
+                        // Only write to the database if there are changes to be made.
+                        if (needsUpdate) {
+                            update(dbRef, updates);
+                            // Return to wait for the update to trigger onValue again with the correct state.
+                            return;
+                        }
                     }
+                    // --- END: FIXED CODE ---
 
                     updateDailyChallenges();
 
@@ -647,7 +671,7 @@
                     inputs.forEach(input => {
                         const el = document.getElementById(input.id);
                         if (el.type === 'number' && (el.value === '' || parseFloat(el.value) <= 0)) {
-                           isValid = false;
+                            isValid = false;
                         }
                         results[input.id] = el.value;
                     });
@@ -845,10 +869,10 @@
                     let sinkingFundDetailsHTML = '';
                     if (isSinkingFund && item.sinkingFundData) {
                         sinkingFundDetailsHTML = `
-                        <div class="sinking-fund-details" style="font-size: 0.9em; color: #555; margin-bottom: 10px; padding: 10px; border-bottom: 1px solid var(--border-color); background-color: #f0f8ff; border-radius: 4px;">
-                            <strong>Sinking Fund Goal:</strong> ${currencyFormatter.format(item.sinkingFundData.totalGoal)} over ${item.sinkingFundData.totalMonths} months. <br>
-                            <strong>Monthly Contribution:</strong> ${currencyFormatter.format(item.limit)}
-                        </div>`;
+                            <div class="sinking-fund-details" style="font-size: 0.9em; color: #555; margin-bottom: 10px; padding: 10px; border-bottom: 1px solid var(--border-color); background-color: #f0f8ff; border-radius: 4px;">
+                                <strong>Sinking Fund Goal:</strong> ${currencyFormatter.format(item.sinkingFundData.totalGoal)} over ${item.sinkingFundData.totalMonths} months. <br>
+                                <strong>Monthly Contribution:</strong> ${currencyFormatter.format(item.limit)}
+                            </div>`;
                     }
 
                     const expenseLogsHTML = item.expenses ? Object.entries(item.expenses).map(([expKey, exp]) => { if (exp.isEditing) { return `<li class="edit-expense-form"><div class="input-group"><input type="number" class="edit-expense-amount-input" value="${exp.amount.toFixed(2)}"><input type="text" class="edit-expense-note-input" placeholder="Note" value="${exp.note || ''}"><input type="date" class="edit-expense-date-input" value="${toInputDate(exp.date)}"></div><div style="margin-top:5px; display:flex; gap:5px;"><button class="save-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">Save</button><button class="cancel-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}" style="background-color:#777">Cancel</button></div></li>`; } return `<li><span class="amount">${currencyFormatter.format(exp.amount)}</span><span class="note">${exp.note}</span><span class="date-stamp">${exp.date || ''}</span><div style="display:flex; gap:5px;"><button class="icon-btn edit-btn edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">✏️</button><button class="icon-btn delete-btn delete-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">✖</button></div></li>`; }).join('') : ''; 
@@ -1401,7 +1425,28 @@
                 } else { alert('Please enter a valid amount.'); }
             } 
             else if (button.classList.contains('delete-expense-btn')) { if (await showConfirm(`Are you sure you want to delete this entry?`)) { remove(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses/${expenseKey}`)); } } 
-            else if (button.classList.contains('delete-btn')) { if (await showConfirm(`Are you sure you want to delete this item?`)) { if (type === 'income' || type === 'expense') { remove(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}`)); } else if (type === 'category') { remove(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}`)); } } } 
+            else if (button.classList.contains('delete-btn')) { 
+                if (await showConfirm(`Are you sure you want to delete this item?`)) { 
+                    if (type === 'income' || type === 'expense') { 
+                        remove(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}`)); 
+                    } else if (type === 'category') { 
+                        const updates = {};
+                        // Add the category itself to be removed
+                        updates[`/budgetedItems/${key}`] = null;
+
+                        // Check for and remove any linked challenges
+                        if (state.activeChallenges) {
+                            for (const challengeKey in state.activeChallenges) {
+                                if (state.activeChallenges[challengeKey].targetCategoryKey === key) {
+                                    updates[`/activeChallenges/${challengeKey}`] = null;
+                                }
+                            }
+                        }
+                        // Perform the multi-path update
+                        update(dbRef, updates);
+                    } 
+                } 
+            } 
             else if (button.classList.contains('edit-item-btn')) { set(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}/isEditing`), true); }
             else if (button.classList.contains('cancel-item-btn')) { set(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}/isEditing`), false); }
             else if (button.classList.contains('save-item-btn')) { const form = button.closest('.input-group'); const newName = form.querySelector('.edit-item-name-input').value.trim(); const newAmount = parseFloat(form.querySelector('.edit-item-amount-input').value); if (newName && newAmount > 0) { update(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}`), { name: newName, amount: newAmount, isEditing: false }); } else { alert('Please enter a valid name and amount.'); } } 
@@ -1444,4 +1489,3 @@
 </body>
 
 </html>
-
