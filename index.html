@@ -41,12 +41,38 @@
             font-weight: 700;
             font-size: 1.15em;
         }
-        header { text-align: center; padding: 28px 20px 18px; margin-bottom: 20px; background: linear-gradient(135deg, var(--accent-color), var(--accent-hover)); color: white; border-radius: 8px; position: relative; }
-    h1 { color: white; margin: 0; font-family: 'Cambria', 'Times New Roman', Times, serif; font-style: italic; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,0.18); }
-    #current-account-name { color: rgba(255,255,255,0.95); }
+        /* --- START: UPDATED HEADER STYLES --- */
+        header { 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            padding: 20px;
+            margin-bottom: 20px; 
+            background: linear-gradient(135deg, var(--accent-color), var(--accent-hover)); 
+            color: white; 
+            border-radius: 8px; 
+            position: relative; 
+        }
+        #app-title-logo {
+            height: 100px;
+            width: auto;
+        }
+        /* Reset margins on header items to let 'gap' control the spacing */
+        header > *, header div > * {
+            margin: 0;
+        }
+        header #current-month {
+            margin-top: 2px;
+        }
+        header #manage-accounts-btn {
+            margin-top: 8px;
+        }
+        /* --- END: UPDATED HEADER STYLES --- */
+        h1 { color: white; margin: 0; font-family: 'Cambria', 'Times New Roman', Times, serif; font-style: italic; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,0.18); }
+        #current-account-name { color: rgba(255,255,255,0.95); }
         #current-account-name {
             font-size: 1.6em;
-            margin: 10px 0 0 0;
             color: #555;
         }
         .summary-display { background: linear-gradient(135deg, var(--accent-color), var(--accent-hover)); color: white; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
@@ -71,11 +97,6 @@
         .add-category-btn { width: 100%; margin-top: 10px; background-color: #f0f0f0; color: var(--text-color); }
         .category-controls { display: flex; gap: 5px; }
         .control-btn { font-size: 0.8em; padding: 5px 10px; background-color: #e9e9e9; color: var(--text-color); }
-        /* moved settings button from top-right to under the month */
-        #manage-accounts-btn {
-            display: inline-block;
-            margin-top: 8px;
-        }
         .budget-category { border: 1px solid var(--border-color); border-radius: 5px; padding: 10px; background-color: #fafafa; margin-bottom: 10px; }
         .budget-category:last-child { margin-bottom: 0; }
         .budget-category-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: bold; }
@@ -198,12 +219,12 @@
 <body>
     <div class="container app-content">
         <header>
-            <h1>Budgety Buddy</h1>
+            <img src="bb%20logo.png" alt="Budgety Buddy Logo" id="app-title-logo">
             <div>
-                <h2 id="current-account-name" style="display: inline-block; margin: 10px 0 0 0;"></h2>
+                <h2 id="current-account-name"></h2>
             </div>
-            <p id="current-month" style="margin-top: 10px;"></p>
-            <div style="text-align:center;">
+            <p id="current-month"></p>
+            <div>
                 <button id="manage-accounts-btn" class="control-btn">Settings & Share</button>
             </div>
         </header>
@@ -452,6 +473,14 @@
             }
         };
 
+        function getLocalDateString() {
+            const date = new Date();
+            const year = date.getFullYear();
+            const month = (date.getMonth() + 1).toString().padStart(2, '0');
+            const day = date.getDate().toString().padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
         function toInputDate(dateStr) {
             if (!dateStr) return new Date().toISOString().split('T')[0];
             try {
@@ -490,14 +519,12 @@
                         return;
                     }
 
-                    // --- START: FIXED CODE ---
                     if (isFirstLoad) {
-                        isFirstLoad = false; // Set this first to prevent re-running this block
+                        isFirstLoad = false; 
                         
                         const updates = {};
                         let needsUpdate = false;
 
-                        // Check if main sections are already collapsed
                         if (state.incomeSectionCollapsed !== true) {
                             updates['/incomeSectionCollapsed'] = true;
                             needsUpdate = true;
@@ -507,7 +534,6 @@
                             needsUpdate = true;
                         }
 
-                        // Check if any individual categories are not collapsed
                         if (state.budgetedItems) {
                             for (const key in state.budgetedItems) {
                                 if (state.budgetedItems[key].collapsed !== true) {
@@ -517,14 +543,11 @@
                             }
                         }
 
-                        // Only write to the database if there are changes to be made.
                         if (needsUpdate) {
                             update(dbRef, updates);
-                            // Return to wait for the update to trigger onValue again with the correct state.
                             return;
                         }
                     }
-                    // --- END: FIXED CODE ---
 
                     updateDailyChallenges();
 
@@ -722,7 +745,7 @@
             
             let expenseLoggerChallengeActive = false;
             if (state.activeChallenges && challengesEnabled) {
-                const todayStr = new Date().toISOString().split('T')[0];
+                const todayStr = getLocalDateString();
                 for (const key in state.activeChallenges) {
                     const challenge = state.activeChallenges[key];
                     if (challenge.challengeId === 'expenseLogger' && challenge.status === 'active' && challenge.lastLogDate !== todayStr) {
@@ -1074,9 +1097,13 @@
                 newChallenge.currentStreak = 0;
                 const yesterday = new Date();
                 yesterday.setDate(yesterday.getDate() - 1);
-                newChallenge.lastLogDate = yesterday.toISOString().split('T')[0];
+                // Temporarily create a date string for yesterday
+                const year = yesterday.getFullYear();
+                const month = (yesterday.getMonth() + 1).toString().padStart(2, '0');
+                const day = yesterday.getDate().toString().padStart(2, '0');
+                newChallenge.lastLogDate = `${year}-${month}-${day}`;
             } else if (challengeId === 'noSpend') {
-                newChallenge.lastLogDate = new Date().toISOString().split('T')[0];
+                newChallenge.lastLogDate = getLocalDateString();
             }
 
             if (challengeId === 'stayUnderBudget') {
@@ -1097,7 +1124,7 @@
         function updateDailyChallenges() {
             if (!state.activeChallenges) return;
 
-            const todayStr = new Date().toISOString().split('T')[0];
+            const todayStr = getLocalDateString();
             const updates = {};
             let challengesUpdated = false;
 
@@ -1147,7 +1174,7 @@
             if (state.challengesEnabled === false) return;
             const activeChallenges = state.activeChallenges || {};
             const updates = {};
-            const today = new Date().toISOString().split('T')[0];
+            const today = getLocalDateString();
 
             Object.entries(activeChallenges).forEach(([key, challenge]) => {
                 if (challenge.status !== 'active') return;
@@ -1191,7 +1218,7 @@
         
         async function logNoSpendDay() {
             if (!state.activeChallenges) return;
-            const todayStr = new Date().toISOString().split('T')[0];
+            const todayStr = getLocalDateString();
             let challengeKey = null;
             let challenge = null;
 
