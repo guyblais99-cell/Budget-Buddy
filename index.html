@@ -207,6 +207,12 @@
             opacity: 1;
         }
 
+        /* --- START: NEW STYLES FOR MANAGE MODE --- */
+        .budget-category:not(.is-managing) .budget-category-header .delete-btn,
+        .budget-category:not(.is-managing) .expense-log .icon-btn {
+            display: none;
+        }
+        /* --- END: NEW STYLES FOR MANAGE MODE --- */
 
         @media (max-width: 600px) { 
             .chart-container { grid-template-columns: 1fr; } 
@@ -865,7 +871,7 @@
                     }
                     itemDiv.innerHTML = `<div class="edit-category-form"><p><strong>Edit ${isSavings ? 'Goal' : 'Category'}</strong></p><div class="input-group"><input type="text" class="edit-name-input" value="${item.name}"><input type="number" class="edit-limit-input" value="${item.limit.toFixed(2)}" min="0" step="0.01"></div>${rolloverControlHTML}<div style="margin-top: 10px; display: flex; gap: 10px;"><button class="save-edit-btn" data-key="${key}">Save</button><button class="cancel-edit-btn" data-key="${key}" style="background-color: #777;">Cancel</button></div></div>`; 
                 } else { 
-                    itemDiv.className = `budget-category ${item.collapsed ? 'collapsed' : ''}`; 
+                    itemDiv.className = `budget-category ${item.collapsed ? 'collapsed' : ''} ${item.isManaging ? 'is-managing' : ''}`; 
                     const totalContributions = toArray(item.expenses).reduce((sum, exp) => sum + exp.amount, 0); 
                     let progressPercent, barColor, overspentPercent = 0, summaryText; 
                     if (isSavings) { 
@@ -1478,7 +1484,19 @@
             else if (button.classList.contains('edit-item-btn')) { set(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}/isEditing`), true); }
             else if (button.classList.contains('cancel-item-btn')) { set(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}/isEditing`), false); }
             else if (button.classList.contains('save-item-btn')) { const form = button.closest('.input-group'); const newName = form.querySelector('.edit-item-name-input').value.trim(); const newAmount = parseFloat(form.querySelector('.edit-item-amount-input').value); if (newName && newAmount > 0) { update(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}`), { name: newName, amount: newAmount, isEditing: false }); } else { alert('Please enter a valid name and amount.'); } } 
-            else if (button.classList.contains('edit-btn')) { if (button.classList.contains('edit-expense-btn')) { set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses/${expenseKey}/isEditing`), true); } else { set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}/isEditing`), true); } } 
+            else if (button.classList.contains('edit-btn')) {
+                if (button.classList.contains('edit-expense-btn')) {
+                    set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses/${expenseKey}/isEditing`), true);
+                } else { // This is the category/goal header edit button
+                    const currentManagingState = state.budgetedItems[key]?.isManaging || false;
+                    // When toggling managing state, we ensure the category's main editing form is closed.
+                    const updates = {
+                        [`/budgetedItems/${key}/isManaging`]: !currentManagingState,
+                        [`/budgetedItems/${key}/isEditing`]: false 
+                    };
+                    update(dbRef, updates);
+                }
+            }
             else if (button.classList.contains('save-edit-btn')) { 
                 const form = button.closest('.edit-category-form'); 
                 const newName = form.querySelector('.edit-name-input').value.trim(); 
