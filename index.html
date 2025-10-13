@@ -89,7 +89,7 @@
         .input-group { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
         .input-group:last-child { margin-bottom: 0; }
         .input-group input { flex-grow: 1; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px; width: 100%; }
-        button { padding: 10px 15px; border: none; border-radius: 5px; background-color: var(--accent-color); color: white; cursor: pointer; transition: background-color 0.3s; }
+        button { padding: 10px 15px; border: none; border-radius: 5px; background-color: var(--accent-color); color: white; cursor: pointer; transition: background-color: 0.3s; }
         button:hover { background-color: var(--accent-hover); }
         .icon-btn { background: none; border: none; cursor: pointer; font-size: 1.2em; padding: 5px; flex-shrink: 0; }
         .delete-btn { color: var(--expense-color); }
@@ -739,7 +739,7 @@
         const calculateTotalIncome = (data) => toArray(data.income).reduce((sum, item) => sum + item.amount, 0);
         const calculateTotalMonthlyExpenses = (data) => toArray(data.monthlyExpenses).reduce((sum, item) => sum + item.amount, 0);
         const calculateIncomeAfterBills = (data) => calculateTotalIncome(data) - calculateTotalMonthlyExpenses(data);
-        const getItemsByType = (data, type) => toArray(data.budgetedItems).filter(item => item.type === type || (type === 'budget' && item.type === undefined));
+        const getItemsByType = (data, type) => toArray(data.budgetedItems).filter(item => item.type === type || (type === 'budget' && !item.type));
         const calculateTotalAllocatedToBudgets = (data) => getItemsByType(data, 'budget').reduce((sum, cat) => sum + cat.limit, 0);
         const calculateTotalAllocatedToSavings = (data) => getItemsByType(data, 'savings').reduce((sum, cat) => sum + cat.limit, 0);
         const calculateTotalBudgetedSpending = (data) => getItemsByType(data, 'budget').flatMap(cat => toArray(cat.expenses)).reduce((sum, exp) => sum + exp.amount, 0);
@@ -767,7 +767,10 @@
             selectors.noSpendTodayBtn.style.display = expenseLoggerChallengeActive ? 'block' : 'none';
 
             const incomeAfterBills = calculateIncomeAfterBills(state);
-            selectors.remainingToSpend.textContent = currencyFormatter.format(incomeAfterBills - calculateTotalBudgetedSpending(state) - calculateTotalContributions(state));
+            
+            // --- NEW LOGIC FOR REMAINING TO SPEND ---
+            selectors.remainingToSpend.textContent = currencyFormatter.format(calculateTotalAllocatedToBudgets(state) - calculateTotalBudgetedSpending(state));
+            
             selectors.summaryTotalIncome.textContent = currencyFormatter.format(calculateTotalIncome(state));
             selectors.summaryTotalExpenses.textContent = currencyFormatter.format(calculateTotalMonthlyExpenses(state));
             const totalAllocatedToBudgets = calculateTotalAllocatedToBudgets(state);
