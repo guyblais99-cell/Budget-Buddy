@@ -101,14 +101,15 @@
         .budget-category:last-child { margin-bottom: 0; }
         .budget-category-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: bold; }
         .budget-category.collapsed .toggle-icon { transform: rotate(-90deg); }
-        .budget-category.collapsed .budget-category-content { display: none; }
+        .budget-category.collapsed .budget-category-content,
+        .budget-category.collapsed .edit-category-form { display: none; }
         .budget-category-content { margin-top: 10px; }
         .budget-summary-text { font-size: 0.9em; font-weight: normal; color: #555; margin-top: 5px; }
         .progress-bar { width: 100%; background-color: #e0e0e0; border-radius: 5px; height: 10px; margin-top: 8px; overflow: hidden; position: relative; }
         .progress-bar-inner { height: 100%; border-radius: 5px; transition: width 0.4s ease-in-out, background-color 0.4s ease-in-out; position: absolute; top: 0; left: 0; }
         .progress-bar-remaining { background-color: var(--income-color); }
         .progress-bar-overspent { background-color: var(--expense-color); }
-        .edit-category-form, .edit-expense-form { padding: 10px; background-color: #eaf2fa; border-radius: 5px; }
+        .edit-category-form, .edit-expense-form { padding: 10px; background-color: #eaf2fa; border-radius: 5px; margin-bottom: 10px; }
         .expense-log { list-style: none; padding: 0; margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 10px; }
         .expense-log li { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 0.9em; flex-wrap: wrap; }
         .expense-log .date-stamp { color: #888; font-size: 0.9em; margin: 0 10px; flex-shrink: 0; white-space: nowrap; }
@@ -207,12 +208,15 @@
             opacity: 1;
         }
 
-        /* --- START: NEW STYLES FOR MANAGE MODE --- */
-        .budget-category:not(.is-managing) .budget-category-header .delete-btn,
-        .budget-category:not(.is-managing) .expense-log .icon-btn {
+        /* --- START: STYLES FOR EDIT/MANAGE MODE --- */
+        .budget-category:not(.is-editing) .budget-category-header .delete-btn,
+        .budget-category:not(.is-editing) .expense-log .icon-btn {
             display: none;
         }
-        /* --- END: NEW STYLES FOR MANAGE MODE --- */
+        .budget-category.is-editing .new-expense-form {
+            display: none;
+        }
+        /* --- END: STYLES FOR EDIT/MANAGE MODE --- */
 
         @media (max-width: 600px) { 
             .chart-container { grid-template-columns: 1fr; } 
@@ -854,8 +858,10 @@
                 const isSavings = item.type === 'savings'; 
                 const parentList = isSavings ? selectors.savingsGoalsList : selectors.budgetCategoriesList; 
                 const itemDiv = document.createElement('div'); 
-                if (item.isEditing) { 
-                    itemDiv.className = 'budget-category';
+                itemDiv.className = `budget-category ${item.collapsed ? 'collapsed' : ''} ${item.isEditing ? 'is-editing' : ''}`;
+                
+                let editFormHTML = '';
+                if (item.isEditing) {
                     let rolloverControlHTML = '';
                     if (!isSavings && !isSinkingFund) {
                         rolloverControlHTML = `
@@ -869,47 +875,72 @@
                                 <input type="checkbox" id="edit-rollover-${key}" class="edit-rollover-toggle" ${item.rolloverEnabled ? 'checked' : ''}>
                             </div>`;
                     }
-                    itemDiv.innerHTML = `<div class="edit-category-form"><p><strong>Edit ${isSavings ? 'Goal' : 'Category'}</strong></p><div class="input-group"><input type="text" class="edit-name-input" value="${item.name}"><input type="number" class="edit-limit-input" value="${item.limit.toFixed(2)}" min="0" step="0.01"></div>${rolloverControlHTML}<div style="margin-top: 10px; display: flex; gap: 10px;"><button class="save-edit-btn" data-key="${key}">Save</button><button class="cancel-edit-btn" data-key="${key}" style="background-color: #777;">Cancel</button></div></div>`; 
+                    editFormHTML = `<div class="edit-category-form"><p><strong>Edit ${isSavings ? 'Goal' : 'Category'}</strong></p><div class="input-group"><input type="text" class="edit-name-input" value="${item.name}"><input type="number" class="edit-limit-input" value="${item.limit.toFixed(2)}" min="0" step="0.01"></div>${rolloverControlHTML}<div style="margin-top: 10px; display: flex; gap: 10px;"><button class="save-edit-btn" data-key="${key}">Save</button><button class="cancel-edit-btn" data-key="${key}" style="background-color: #777;">Cancel</button></div></div>`;
+                }
+                
+                const totalContributions = toArray(item.expenses).reduce((sum, exp) => sum + exp.amount, 0); 
+                let progressPercent, barColor, overspentPercent = 0, summaryText; 
+                if (isSavings) { 
+                    progressPercent = item.limit > 0 ? Math.min(100, 100 * (totalContributions / item.limit)) : 0; 
+                    barColor = 'var(--income-color)'; 
+                    summaryText = `${currencyFormatter.format(totalContributions)} saved of ${currencyFormatter.format(item.limit)} goal`; 
                 } else { 
-                    itemDiv.className = `budget-category ${item.collapsed ? 'collapsed' : ''} ${item.isManaging ? 'is-managing' : ''}`; 
-                    const totalContributions = toArray(item.expenses).reduce((sum, exp) => sum + exp.amount, 0); 
-                    let progressPercent, barColor, overspentPercent = 0, summaryText; 
-                    if (isSavings) { 
-                        progressPercent = item.limit > 0 ? Math.min(100, 100 * (totalContributions / item.limit)) : 0; 
-                        barColor = 'var(--income-color)'; 
-                        summaryText = `${currencyFormatter.format(totalContributions)} saved of ${currencyFormatter.format(item.limit)} goal`; 
-                    } else { 
-                        const amountLeft = (item.limit - totalContributions); 
-                        summaryText = `${currencyFormatter.format(amountLeft)} left of ${currencyFormatter.format(item.limit)}`; 
+                    const amountLeft = (item.limit - totalContributions); 
+                    summaryText = `${currencyFormatter.format(amountLeft)} left of ${currencyFormatter.format(item.limit)}`; 
 
-                        if (item.limit > 0) {
-                            if (totalContributions <= item.limit) {
-                                progressPercent = Math.max(0, 100 * (amountLeft / item.limit));
-                                overspentPercent = 0;
-                            } else {
-                                progressPercent = 0;
-                                overspentPercent = Math.min(200, 100 * ((totalContributions - item.limit) / item.limit));
-                            }
+                    if (item.limit > 0) {
+                        if (totalContributions <= item.limit) {
+                            progressPercent = Math.max(0, 100 * (amountLeft / item.limit));
+                            overspentPercent = 0;
                         } else {
-                            progressPercent = 100;
+                            progressPercent = 0;
+                            overspentPercent = Math.min(200, 100 * ((totalContributions - item.limit) / item.limit));
                         }
-                        barColor = getColorForPercentage(progressPercent);
-                    } 
-                    
-                    let sinkingFundDetailsHTML = '';
-                    if (isSinkingFund && item.sinkingFundData) {
-                        sinkingFundDetailsHTML = `
-                            <div class="sinking-fund-details" style="font-size: 0.9em; color: #555; margin-bottom: 10px; padding: 10px; border-bottom: 1px solid var(--border-color); background-color: #f0f8ff; border-radius: 4px;">
-                                <strong>Sinking Fund Goal:</strong> ${currencyFormatter.format(item.sinkingFundData.totalGoal)} over ${item.sinkingFundData.totalMonths} months. <br>
-                                <strong>Monthly Contribution:</strong> ${currencyFormatter.format(item.limit)}
-                            </div>`;
+                    } else {
+                        progressPercent = 100;
                     }
-
-                    const expenseLogsHTML = item.expenses ? Object.entries(item.expenses).map(([expKey, exp]) => { if (exp.isEditing) { return `<li class="edit-expense-form"><div class="input-group"><input type="number" class="edit-expense-amount-input" value="${exp.amount.toFixed(2)}"><input type="text" class="edit-expense-note-input" placeholder="Note" value="${exp.note || ''}"><input type="date" class="edit-expense-date-input" value="${toInputDate(exp.date)}"></div><div style="margin-top:5px; display:flex; gap:5px;"><button class="save-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">Save</button><button class="cancel-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}" style="background-color:#777">Cancel</button></div></li>`; } return `<li><span class="amount">${currencyFormatter.format(exp.amount)}</span><span class="note">${exp.note}</span><span class="date-stamp">${exp.date || ''}</span><div style="display:flex; gap:5px;"><button class="icon-btn edit-btn edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">✏️</button><button class="icon-btn delete-btn delete-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">✖</button></div></li>`; }).join('') : ''; 
-                    const reorderControlsHTML = isSavings ? '' : `<span class="reorder-controls"><button class="move-btn move-up-btn" data-key="${key}" ${index === 0 ? 'disabled' : ''}>🔼</button><button class="move-btn move-down-btn" data-key="${key}" ${index === sortedItems.length - 1 ? 'disabled' : ''}>🔽</button></span>`; 
-                    
-                    itemDiv.innerHTML = `<div class="budget-category-header" data-key="${key}"><span style="display: flex; align-items: center;">${challengeBadgeHTML}${reorderControlsHTML}${sinkingFundIcon}${item.name}</span><div style="display: flex; align-items: center; gap: 5px;"><button class="icon-btn edit-btn" data-key="${key}">✏️</button><button class="icon-btn delete-btn" data-key="${key}" data-type="category">✖</button><span class="toggle-icon" style="margin-left: 15px;">▼</span></div></div><div class="budget-summary-text">${summaryText}</div><div class="progress-bar"><div class="progress-bar-inner" style="width: ${isSavings ? progressPercent : progressPercent}%; background-color: ${barColor};"></div>${!isSavings ? `<div class="progress-bar-inner progress-bar-overspent" style="width: ${overspentPercent}%;"></div>` : ''}</div><div class="budget-category-content">${sinkingFundDetailsHTML}<div class="new-expense-form"><div class="input-group"><input type="number" placeholder="Amount" class="expense-amount-input" min="0" step="0.01"><input type="text" placeholder="Note (optional)" class="expense-note-input"><button class="add-expense-to-category-btn">${isSavings ? 'Add Contribution' : 'Add Expense'}</button></div></div><ul class="expense-log">${expenseLogsHTML}</ul></div>`; 
+                    barColor = getColorForPercentage(progressPercent);
                 } 
+                
+                let sinkingFundDetailsHTML = '';
+                if (isSinkingFund && item.sinkingFundData) {
+                    sinkingFundDetailsHTML = `
+                        <div class="sinking-fund-details" style="font-size: 0.9em; color: #555; margin-bottom: 10px; padding: 10px; border-bottom: 1px solid var(--border-color); background-color: #f0f8ff; border-radius: 4px;">
+                            <strong>Sinking Fund Goal:</strong> ${currencyFormatter.format(item.sinkingFundData.totalGoal)} over ${item.sinkingFundData.totalMonths} months. <br>
+                            <strong>Monthly Contribution:</strong> ${currencyFormatter.format(item.limit)}
+                        </div>`;
+                }
+
+                const expenseLogsHTML = item.expenses ? Object.entries(item.expenses).map(([expKey, exp]) => { if (exp.isEditing) { return `<li class="edit-expense-form"><div class="input-group"><input type="number" class="edit-expense-amount-input" value="${exp.amount.toFixed(2)}"><input type="text" class="edit-expense-note-input" placeholder="Note" value="${exp.note || ''}"><input type="date" class="edit-expense-date-input" value="${toInputDate(exp.date)}"></div><div style="margin-top:5px; display:flex; gap:5px;"><button class="save-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">Save</button><button class="cancel-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}" style="background-color:#777">Cancel</button></div></li>`; } return `<li><span class="amount">${currencyFormatter.format(exp.amount)}</span><span class="note">${exp.note}</span><span class="date-stamp">${exp.date || ''}</span><div style="display:flex; gap:5px;"><button class="icon-btn edit-btn edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">✏️</button><button class="icon-btn delete-btn delete-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">✖</button></div></li>`; }).join('') : ''; 
+                const reorderControlsHTML = isSavings ? '' : `<span class="reorder-controls"><button class="move-btn move-up-btn" data-key="${key}" ${index === 0 ? 'disabled' : ''}>🔼</button><button class="move-btn move-down-btn" data-key="${key}" ${index === sortedItems.length - 1 ? 'disabled' : ''}>🔽</button></span>`; 
+                
+                itemDiv.innerHTML = `
+                    <div class="budget-category-header" data-key="${key}">
+                        <span style="display: flex; align-items: center;">${challengeBadgeHTML}${reorderControlsHTML}${sinkingFundIcon}${item.name}</span>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <button class="icon-btn edit-btn" data-key="${key}">✏️</button>
+                            <button class="icon-btn delete-btn" data-key="${key}" data-type="category">✖</button>
+                            <span class="toggle-icon" style="margin-left: 15px;">▼</span>
+                        </div>
+                    </div>
+                    ${editFormHTML}
+                    <div class="budget-summary-text">${summaryText}</div>
+                    <div class="progress-bar">
+                        <div class="progress-bar-inner" style="width: ${isSavings ? progressPercent : progressPercent}%; background-color: ${barColor};"></div>
+                        ${!isSavings ? `<div class="progress-bar-inner progress-bar-overspent" style="width: ${overspentPercent}%;"></div>` : ''}
+                    </div>
+                    <div class="budget-category-content">
+                        ${sinkingFundDetailsHTML}
+                        <div class="new-expense-form">
+                            <div class="input-group">
+                                <input type="number" placeholder="Amount" class="expense-amount-input" min="0" step="0.01">
+                                <input type="text" placeholder="Note (optional)" class="expense-note-input">
+                                <button class="add-expense-to-category-btn">${isSavings ? 'Add Contribution' : 'Add Expense'}</button>
+                            </div>
+                        </div>
+                        <ul class="expense-log">${expenseLogsHTML}</ul>
+                    </div>`;
+                
                 parentList.appendChild(itemDiv); 
             }); 
         }
@@ -1484,19 +1515,14 @@
             else if (button.classList.contains('edit-item-btn')) { set(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}/isEditing`), true); }
             else if (button.classList.contains('cancel-item-btn')) { set(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}/isEditing`), false); }
             else if (button.classList.contains('save-item-btn')) { const form = button.closest('.input-group'); const newName = form.querySelector('.edit-item-name-input').value.trim(); const newAmount = parseFloat(form.querySelector('.edit-item-amount-input').value); if (newName && newAmount > 0) { update(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}`), { name: newName, amount: newAmount, isEditing: false }); } else { alert('Please enter a valid name and amount.'); } } 
-            else if (button.classList.contains('edit-btn')) {
-                if (button.classList.contains('edit-expense-btn')) {
-                    set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses/${expenseKey}/isEditing`), true);
+            else if (button.classList.contains('edit-btn')) { 
+                if (button.classList.contains('edit-expense-btn')) { 
+                    set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses/${expenseKey}/isEditing`), true); 
                 } else { // This is the category/goal header edit button
-                    const currentManagingState = state.budgetedItems[key]?.isManaging || false;
-                    // When toggling managing state, we ensure the category's main editing form is closed.
-                    const updates = {
-                        [`/budgetedItems/${key}/isManaging`]: !currentManagingState,
-                        [`/budgetedItems/${key}/isEditing`]: false 
-                    };
-                    update(dbRef, updates);
-                }
-            }
+                    const currentIsEditing = state.budgetedItems[key]?.isEditing || false;
+                    set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}/isEditing`), !currentIsEditing);
+                } 
+            } 
             else if (button.classList.contains('save-edit-btn')) { 
                 const form = button.closest('.edit-category-form'); 
                 const newName = form.querySelector('.edit-name-input').value.trim(); 
