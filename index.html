@@ -260,6 +260,17 @@
             transform: rotate(180deg);
         }
         /* --- END: TUTORIAL STYLES --- */
+        
+        /* --- START: NEW FEATURE STYLES --- */
+        .last-month-spending {
+            font-size: 0.85em;
+            color: #888;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px dashed var(--border-color);
+            font-style: italic;
+        }
+        /* --- END: NEW FEATURE STYLES --- */
 
         @media (max-width: 600px) { 
             .chart-container { grid-template-columns: 1fr; } 
@@ -281,6 +292,7 @@
                 <button id="manage-accounts-btn" class="control-btn">Settings & Share</button>
             </div>
         </header>
+
         <button id="review-btn" style="width: 100%; margin-bottom: 10px;">📊 Monthly Review</button>
         <button id="challenge-center-btn" style="width: 100%; margin-bottom: 20px;">
             🏆 Challenge Center
@@ -297,6 +309,8 @@
                 <h4>Monthly Fixed Expenses</h4><div id="expense-list"></div><div class="input-group"><input type="text" id="expense-name-input" placeholder="e.g., Rent"><input type="number" id="expense-amount-input" placeholder="Amount" min="0" step="0.01"><button id="add-expense-btn" class="add-btn">+</button></div>
             </div>
         </div>
+
+        <button id="quick-add-expense-btn" style="width: 100%; margin-bottom: 20px;">＋ Quick Add Expense</button>
 
         <div class="summary-display budget-section-summary"><h2>Remaining to Spend</h2><p id="remaining-to-spend">$0.00</p></div>
         
@@ -526,6 +540,7 @@
             noSpendTodayBtn: document.getElementById('no-spend-today-btn'),
             showTutorialBtn: document.getElementById('show-tutorial-btn'),
             tutorialSection: document.getElementById('tutorial-section'),
+            quickAddExpenseBtn: document.getElementById('quick-add-expense-btn'),
         };
 
         const currencyFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
@@ -992,6 +1007,18 @@
                         </div>`;
                 }
 
+                let lastMonthSpendingHTML = '';
+                if (!isSavings && !isSinkingFund && history.length > 0) {
+                    const lastMonth = history[0];
+                    const categoryInHistory = Object.values(lastMonth.budgetedItems || {}).find(cat => cat.name === item.name);
+                    if (categoryInHistory) {
+                        const lastMonthTotal = toArray(categoryInHistory.expenses).reduce((sum, exp) => sum + exp.amount, 0);
+                        if (lastMonthTotal > 0) {
+                            lastMonthSpendingHTML = `<div class="last-month-spending">Last month's spending: ${currencyFormatter.format(lastMonthTotal)}</div>`;
+                        }
+                    }
+                }
+
                 const expenseLogsHTML = item.expenses ? Object.entries(item.expenses).map(([expKey, exp]) => { if (exp.isEditing) { return `<li class="edit-expense-form"><div class="input-group"><input type="number" class="edit-expense-amount-input" value="${exp.amount.toFixed(2)}"><input type="text" class="edit-expense-note-input" placeholder="Note" value="${exp.note || ''}"><input type="date" class="edit-expense-date-input" value="${toInputDate(exp.date)}"></div><div style="margin-top:5px; display:flex; gap:5px;"><button class="save-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">Save</button><button class="cancel-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}" style="background-color:#777">Cancel</button></div></li>`; } return `<li><span class="amount">${currencyFormatter.format(exp.amount)}</span><span class="note">${exp.note}</span><span class="date-stamp">${exp.date || ''}</span><div style="display:flex; gap:5px;"><button class="icon-btn edit-btn edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">✏️</button><button class="icon-btn delete-btn delete-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">✖</button></div></li>`; }).join('') : ''; 
                 const reorderControlsHTML = isSavings ? '' : `<span class="reorder-controls"><button class="move-btn move-up-btn" data-key="${key}" ${index === 0 ? 'disabled' : ''}>🔼</button><button class="move-btn move-down-btn" data-key="${key}" ${index === sortedItems.length - 1 ? 'disabled' : ''}>🔽</button></span>`; 
                 
@@ -1012,6 +1039,7 @@
                     </div>
                     <div class="budget-category-content">
                         ${sinkingFundDetailsHTML}
+                        ${lastMonthSpendingHTML}
                         <div class="new-expense-form">
                             <div class="input-group">
                                 <input type="number" placeholder="Amount" class="expense-amount-input" min="0" step="0.01">
@@ -1388,6 +1416,49 @@
             if (header) {
                 const item = header.parentElement;
                 item.classList.toggle('active');
+            }
+        });
+
+        // --- QUICK ADD EXPENSE LISTENER ---
+        selectors.quickAddExpenseBtn.addEventListener('click', async () => {
+            const spendingCategories = Object.entries(state.budgetedItems || {})
+                .filter(([key, cat]) => cat.type !== 'savings' && !cat.isSinkingFund);
+            
+            if (spendingCategories.length === 0) {
+                alert("Please create at least one spending category before adding an expense.");
+                return;
+            }
+
+            const result = await showPrompt({
+                title: "Quick Add Expense",
+                inputs: [
+                    { type: 'number', id: 'quick-amount', label: 'Amount:' },
+                    { 
+                        type: 'select', 
+                        id: 'quick-category', 
+                        label: 'Category:', 
+                        options: spendingCategories.map(([key, cat]) => ({ value: key, text: cat.name }))
+                    },
+                    { type: 'text', id: 'quick-note', label: 'Note (optional):' }
+                ]
+            });
+
+            if (result) {
+                const amount = parseFloat(result['quick-amount']);
+                const categoryKey = result['quick-category'];
+                const note = result['quick-note'].trim();
+                
+                if (amount > 0 && categoryKey) {
+                    push(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses`), { 
+                        amount, 
+                        note, 
+                        date: new Date().toLocaleDateString(), 
+                        isEditing: false 
+                    });
+                    updateChallengeProgress({ categoryKey, amount });
+                } else {
+                    alert('Please enter a valid amount and select a category.');
+                }
             }
         });
 
