@@ -89,7 +89,7 @@
         .input-group { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
         .input-group:last-child { margin-bottom: 0; }
         .input-group input { flex-grow: 1; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px; width: 100%; }
-        button { padding: 10px 15px; border: none; border-radius: 5px; background-color: var(--accent-color); color: white; cursor: pointer; transition: background-color: 0.3s; }
+        button { padding: 10px 15px; border: none; border-radius: 5px; background-color: var(--accent-color); color: white; cursor: pointer; transition: background-color 0.3s; }
         button:hover { background-color: var(--accent-hover); }
         .icon-btn { background: none; border: none; cursor: pointer; font-size: 1.2em; padding: 5px; flex-shrink: 0; }
         .delete-btn { color: var(--expense-color); }
@@ -119,6 +119,7 @@
         #confirm-modal, #prompt-modal { z-index: 1010; }
         .modal-content { background-color: white; padding: 25px; border-radius: 10px; width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto; }
         #confirm-modal .modal-content, #onboarding-modal .modal-content, #accounts-modal .modal-content, #prompt-modal .modal-content { max-width: 400px; text-align: center; }
+        #accounts-modal .modal-content { max-width: 500px; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px; }
         .modal-header h2 { margin: 0; }
         .modal-header .close-btn { font-size: 1.8em; cursor: pointer; background: none; border: none; padding: 0 10px; color: #333; }
@@ -217,6 +218,48 @@
             display: none;
         }
         /* --- END: STYLES FOR EDIT/MANAGE MODE --- */
+
+        /* --- START: TUTORIAL STYLES --- */
+        #tutorial-section {
+            display: none;
+            text-align: left;
+            border-top: 1px solid var(--border-color);
+            margin-top: 15px;
+            padding-top: 15px;
+        }
+        .tutorial-item {
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .tutorial-header {
+            background-color: #f7f7f7;
+            padding: 10px 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+        }
+        .tutorial-content {
+            padding: 15px;
+            display: none;
+            font-size: 0.95em;
+            line-height: 1.5;
+        }
+        .tutorial-content p {
+            margin: 0 0 10px 0;
+        }
+        .tutorial-content p:last-child {
+            margin-bottom: 0;
+        }
+        .tutorial-item.active .tutorial-content {
+            display: block;
+        }
+        .tutorial-item.active .tutorial-header .toggle-icon {
+            transform: rotate(180deg);
+        }
+        /* --- END: TUTORIAL STYLES --- */
 
         @media (max-width: 600px) { 
             .chart-container { grid-template-columns: 1fr; } 
@@ -344,7 +387,40 @@
             </label>
             <input type="checkbox" id="toggle-challenges">
         </div>
-        <hr><button id="leave-budget-btn" style="width:100%; background-color: var(--expense-color);">Leave Budget</button></div></div></div>
+        <hr>
+        <button id="show-tutorial-btn" style="width: 100%; margin-bottom: 15px; background-color: #e9e9e9; color: var(--text-color);">📖 App Tutorial</button>
+        <div id="tutorial-section">
+            <div class="tutorial-item">
+                <div class="tutorial-header"><span>⭐ The Big Idea: Zero-Based Budgeting</span> <span class="toggle-icon">▼</span></div>
+                <div class="tutorial-content">
+                    <p>The goal of this app is to help you create a **zero-based budget**. This simply means you give every single dollar a "job" to do.</p>
+                    <p>Your main objective is to make the **"Remaining to Allocate"** number in the Allocation Center equal **$0.00**. This ensures that all your income is intentionally assigned to a bill, a spending category, or a savings goal, giving you total control over your money.</p>
+                </div>
+            </div>
+            <div class="tutorial-item">
+                <div class="tutorial-header"><span>🚀 Getting Started in 3 Steps</span> <span class="toggle-icon">▼</span></div>
+                <div class="tutorial-content">
+                    <p><b>1. Add Income & Bills:</b> In the "Income & Fixed Expenses" section, enter your monthly paychecks and all recurring bills like rent, utilities, and subscriptions. This calculates your starting money, shown as "Available to Allocate".</p>
+                    <p><b>2. Create Spending Budgets:</b> In "Budgeted Spending," create categories for your variable spending (e.g., Groceries, Gas, Fun Money) and set a spending limit for each.</p>
+                    <p><b>3. Plan Your Savings:</b> Finally, go to "Savings Goals" and create goals for the rest of your money. Assigning your remaining funds here is how you get the "Remaining to Allocate" down to zero!</p>
+                </div>
+            </div>
+            <div class="tutorial-item">
+                <div class="tutorial-header"><span>💰 Understanding "Remaining to Spend"</span> <span class="toggle-icon">▼</span></div>
+                <div class="tutorial-content">
+                    <p>This is the most important number for your daily life! It shows you how much money you have left to spend **only within your "Budgeted Spending" categories**.</p>
+                    <p>It's your guilt-free spending money. It is completely separate from your savings goals, so you always know exactly what you can spend without affecting your ability to save.</p>
+                </div>
+            </div>
+            <div class="tutorial-item">
+                <div class="tutorial-header"><span>🏦 What's a "Sinking Fund"?</span> <span class="toggle-icon">▼</span></div>
+                <div class="tutorial-content">
+                    <p>A Sinking Fund is a smart way to save for a **large, specific future expense** (like new tires, a vacation, or holiday gifts). </p>
+                    <p>When you create one, you set a total goal and a number of months. The app automatically calculates how much you need to budget for it each month. It's a powerful tool to plan ahead and avoid debt.</p>
+                </div>
+            </div>
+        </div>
+        <button id="leave-budget-btn" style="width:100%; background-color: var(--expense-color);">Leave Budget</button></div></div></div>
     <div class="modal-overlay" id="confirm-modal"><div class="modal-content"><p id="confirm-msg"></p><div class="confirm-actions"><button id="confirm-cancel-btn" style="background-color: #777;">Cancel</button><button id="confirm-ok-btn">Confirm</button></div></div></div>
     
     <div class="modal-overlay" id="challenge-modal">
@@ -448,6 +524,8 @@
             reviewExpenseLogSection: document.getElementById('review-expense-log-section'),
             reviewExpenseLogList: document.getElementById('review-expense-log-list'),
             noSpendTodayBtn: document.getElementById('no-spend-today-btn'),
+            showTutorialBtn: document.getElementById('show-tutorial-btn'),
+            tutorialSection: document.getElementById('tutorial-section'),
         };
 
         const currencyFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
@@ -1298,6 +1376,20 @@
         selectors.createNewBudgetBtn.addEventListener('click', startNewBudget);
         selectors.joinBudgetBtn.addEventListener('click', joinBudget);
         selectors.noSpendTodayBtn.addEventListener('click', logNoSpendDay); 
+
+        // --- TUTORIAL LISTENERS ---
+        selectors.showTutorialBtn.addEventListener('click', () => {
+            const tutorial = selectors.tutorialSection;
+            tutorial.style.display = tutorial.style.display === 'block' ? 'none' : 'block';
+        });
+
+        selectors.tutorialSection.addEventListener('click', (e) => {
+            const header = e.target.closest('.tutorial-header');
+            if (header) {
+                const item = header.parentElement;
+                item.classList.toggle('active');
+            }
+        });
 
         selectors.reviewTabs.addEventListener('click', (e) => {
             const btn = e.target.closest('.tab-btn');
