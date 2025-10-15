@@ -88,7 +88,7 @@
         .section.collapsed > .section-header .toggle-icon { transform: rotate(-90deg); }
         .input-group { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
         .input-group:last-child { margin-bottom: 0; }
-        .input-group input { flex-grow: 1; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px; width: 100%; }
+        .input-group input, .input-group select { flex-grow: 1; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px; width: 100%; }
         button { padding: 10px 15px; border: none; border-radius: 5px; background-color: var(--accent-color); color: white; cursor: pointer; transition: background-color 0.3s; }
         button:hover { background-color: var(--accent-hover); }
         .icon-btn { background: none; border: none; cursor: pointer; font-size: 1.2em; padding: 5px; flex-shrink: 0; }
@@ -116,10 +116,10 @@
         .expense-log .amount { font-weight: 500; margin-right: 5px; }
         .expense-log .note { color: #777; font-style: italic; margin-left: 5px; flex-grow: 1; word-break: break-all; }
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 1000; }
-        #confirm-modal, #prompt-modal { z-index: 1010; }
+        #confirm-modal, #prompt-modal, #rollover-modal { z-index: 1010; }
         .modal-content { background-color: white; padding: 25px; border-radius: 10px; width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto; }
         #confirm-modal .modal-content, #onboarding-modal .modal-content, #accounts-modal .modal-content, #prompt-modal .modal-content { max-width: 400px; text-align: center; }
-        #accounts-modal .modal-content { max-width: 500px; }
+        #accounts-modal .modal-content, #rollover-modal .modal-content { max-width: 500px; text-align: left;}
         .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px; }
         .modal-header h2 { margin: 0; }
         .modal-header .close-btn { font-size: 1.8em; cursor: pointer; background: none; border: none; padding: 0 10px; color: #333; }
@@ -270,6 +270,32 @@
             border-bottom: 1px dashed var(--border-color);
             font-style: italic;
         }
+        .rollover-item {
+            background-color: #f9f9f9;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .rollover-item h4 {
+            margin: 0 0 10px 0;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 5px;
+        }
+        .rollover-details {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            font-size: 0.9em;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .rollover-details span {
+            display: block;
+        }
+        .rollover-details strong {
+            font-size: 1.1em;
+        }
         /* --- END: NEW FEATURE STYLES --- */
 
         @media (max-width: 600px) { 
@@ -277,6 +303,7 @@
             /* ensure settings button flows under the month on small screens */
             #manage-accounts-btn { position: static; margin-top: 8px; }
             #app-logo { top: 15px; left: 15px; }
+            .rollover-details { grid-template-columns: 1fr; text-align: left; }
         }
     </style>
 </head>
@@ -437,6 +464,23 @@
         <button id="leave-budget-btn" style="width:100%; background-color: var(--expense-color);">Leave Budget</button></div></div></div>
     <div class="modal-overlay" id="confirm-modal"><div class="modal-content"><p id="confirm-msg"></p><div class="confirm-actions"><button id="confirm-cancel-btn" style="background-color: #777;">Cancel</button><button id="confirm-ok-btn">Confirm</button></div></div></div>
     
+    <div class="modal-overlay" id="rollover-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="rollover-title">Month Rollover Summary</h2>
+                <button class="close-btn" id="close-rollover-modal-btn">&times;</button>
+            </div>
+            <p style="font-size: 0.9em; color: #555; margin-top: -10px; margin-bottom: 20px;">
+                Here's a summary of your unspent funds from last month. You can transfer these amounts to your savings goals as a bonus!
+            </p>
+            <div id="rollover-summary-list"></div>
+            <div class="confirm-actions">
+                <button id="rollover-skip-btn" style="background-color: #777;">Skip for Now</button>
+                <button id="rollover-confirm-btn">Confirm Transfers</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="challenge-modal">
         <div class="modal-content">
             <div class="modal-header"><h2>🏆 Challenge Center</h2><button class="close-btn" id="close-challenge-modal-btn">&times;</button></div>
@@ -541,6 +585,12 @@
             showTutorialBtn: document.getElementById('show-tutorial-btn'),
             tutorialSection: document.getElementById('tutorial-section'),
             quickAddExpenseBtn: document.getElementById('quick-add-expense-btn'),
+            rolloverModal: document.getElementById('rollover-modal'),
+            closeRolloverModalBtn: document.getElementById('close-rollover-modal-btn'),
+            rolloverTitle: document.getElementById('rollover-title'),
+            rolloverSummaryList: document.getElementById('rollover-summary-list'),
+            rolloverConfirmBtn: document.getElementById('rollover-confirm-btn'),
+            rolloverSkipBtn: document.getElementById('rollover-skip-btn'),
         };
 
         const currencyFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
@@ -615,9 +665,10 @@
             onValue(dbRef, async (snapshot) => { 
                 const data = snapshot.val(); 
                 if (data) { 
+                    const oldState = { ...state };
                     state = data; 
                     
-                    const monthChanged = await checkForNewMonth();
+                    const monthChanged = await checkForNewMonth(oldState);
                     if (monthChanged) {
                         return;
                     }
@@ -663,7 +714,7 @@
             localStorage.setItem('lastBudgetId', budgetId);
         }
         
-        async function checkForNewMonth() {
+        async function checkForNewMonth(oldState) {
             const currentMonthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
             if (state.monthYear && new Date(currentMonthYear) > new Date(state.monthYear)) {
                 
@@ -703,9 +754,20 @@
                     newEarnedTrophies[newTrophyKey] = { ...challenge, archivedMonth: previousMonthName };
                 });
 
+                const rolloverSummaryData = [];
                 const newBudgets = state.budgetedItems ? Object.entries(state.budgetedItems).reduce((acc, [key, item]) => {
                     const totalSpent = (item.expenses ? Object.values(item.expenses) : []).reduce((sum, exp) => sum + exp.amount, 0);
                     const unspent = item.limit - totalSpent;
+                    
+                    if(item.type !== 'savings' && unspent > 0) {
+                        rolloverSummaryData.push({
+                            name: item.name,
+                            budgeted: item.limit,
+                            spent: totalSpent,
+                            unspent: unspent
+                        });
+                    }
+                    
                     let newLimit = item.limit;
                     if (item.type !== 'savings' && item.rolloverEnabled && unspent > 0) {
                         newLimit = item.limit + unspent;
@@ -725,17 +787,51 @@
 
                 await set(dbRef, newMonthData);
                 
+                showRolloverSummary(previousMonthName, rolloverSummaryData);
+                
                 if (newlyCompletedKeysForTrophy.length > 0) {
                     setTimeout(() => {
                         const challengeNames = newlyCompletedKeysForTrophy.map(key => `"${CHALLENGE_DEFINITIONS[evaluatedChallenges[key].challengeId].title}"`).join(' and ');
                         showChallengeAlert(`Congratulations! You completed the ${challengeNames} challenge for ${previousMonthName} and earned a new trophy!`);
                     }, 500);
-                } else {
-                        setTimeout(() => alert(`Welcome to a new month! Your previous month's data for "${state.accountName}" has been archived.`), 200);
                 }
                 return true;
             }
             return false;
+        }
+
+        function showRolloverSummary(previousMonthName, summaryData) {
+            if (summaryData.length === 0) {
+                alert(`Welcome to a new month! Your previous month's data for "${state.accountName}" has been archived.`);
+                return;
+            }
+        
+            selectors.rolloverTitle.textContent = `${previousMonthName} Rollover`;
+            const savingsGoals = Object.entries(state.budgetedItems || {}).filter(([k,v]) => v.type === 'savings');
+            
+            selectors.rolloverSummaryList.innerHTML = summaryData.map(item => {
+                const savingsOptions = savingsGoals.length > 0 
+                    ? savingsGoals.map(([key, goal]) => `<option value="${key}">${goal.name}</option>`).join('')
+                    : '<option value="">No savings goals found</option>';
+
+                return `
+                    <div class="rollover-item" data-category-name="${item.name}">
+                        <h4>${item.name}</h4>
+                        <div class="rollover-details">
+                            <div><span>Budgeted</span><strong>${currencyFormatter.format(item.budgeted)}</strong></div>
+                            <div><span>Spent</span><strong>${currencyFormatter.format(item.spent)}</strong></div>
+                            <div><span>Unspent</span><strong style="color: var(--income-color);">${currencyFormatter.format(item.unspent)}</strong></div>
+                        </div>
+                        <label>Transfer to Savings:</label>
+                        <div class="input-group">
+                            <input type="number" class="rollover-amount-input" value="${item.unspent.toFixed(2)}" min="0" max="${item.unspent.toFixed(2)}" step="0.01">
+                            <select class="rollover-savings-select" ${savingsGoals.length === 0 ? 'disabled' : ''}>${savingsOptions}</select>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            selectors.rolloverModal.style.display = 'flex';
         }
         
         function showChallengeAlert(message, type = 'success') {
@@ -958,20 +1054,37 @@
                 
                 let editFormHTML = '';
                 if (item.isEditing) {
-                    let rolloverControlHTML = '';
-                    if (!isSavings && !isSinkingFund) {
-                        rolloverControlHTML = `
-                            <div class="setting-toggle" style="padding: 5px 0; font-weight: normal;">
-                                <label for="edit-rollover-${key}">Rollover unspent funds
-                                    <span class="tooltip-container">
-                                        <span class="info-icon">?</span>
-                                        <span class="tooltip-text">If checked, any money left in this category at the end of the month will be added to next month's budget for this same category.</span>
-                                    </span>
-                                </label>
-                                <input type="checkbox" id="edit-rollover-${key}" class="edit-rollover-toggle" ${item.rolloverEnabled ? 'checked' : ''}>
-                            </div>`;
+                    if(isSinkingFund) {
+                         editFormHTML = `<div class="edit-category-form">
+                            <p><strong>Edit Sinking Fund</strong></p>
+                            <div class="input-group">
+                                <input type="text" class="edit-name-input" value="${item.name}">
+                            </div>
+                            <div class="input-group">
+                                <input type="number" class="edit-sf-goal-input" value="${item.sinkingFundData.totalGoal}" placeholder="Total Goal" min="0" step="0.01">
+                                <input type="number" class="edit-sf-months-input" value="${item.sinkingFundData.totalMonths}" placeholder="# of Months" min="1" step="1">
+                            </div>
+                            <div style="margin-top: 10px; display: flex; gap: 10px;">
+                                <button class="save-edit-btn" data-key="${key}">Save</button>
+                                <button class="cancel-edit-btn" data-key="${key}" style="background-color: #777;">Cancel</button>
+                            </div>
+                        </div>`;
+                    } else {
+                        let rolloverControlHTML = '';
+                        if (!isSavings) {
+                            rolloverControlHTML = `
+                                <div class="setting-toggle" style="padding: 5px 0; font-weight: normal;">
+                                    <label for="edit-rollover-${key}">Rollover unspent funds
+                                        <span class="tooltip-container">
+                                            <span class="info-icon">?</span>
+                                            <span class="tooltip-text">If checked, any money left in this category at the end of the month will be added to next month's budget for this same category.</span>
+                                        </span>
+                                    </label>
+                                    <input type="checkbox" id="edit-rollover-${key}" class="edit-rollover-toggle" ${item.rolloverEnabled ? 'checked' : ''}>
+                                </div>`;
+                        }
+                        editFormHTML = `<div class="edit-category-form"><p><strong>Edit ${isSavings ? 'Goal' : 'Category'}</strong></p><div class="input-group"><input type="text" class="edit-name-input" value="${item.name}"><input type="number" class="edit-limit-input" value="${item.limit.toFixed(2)}" min="0" step="0.01"></div>${rolloverControlHTML}<div style="margin-top: 10px; display: flex; gap: 10px;"><button class="save-edit-btn" data-key="${key}">Save</button><button class="cancel-edit-btn" data-key="${key}" style="background-color: #777;">Cancel</button></div></div>`;
                     }
-                    editFormHTML = `<div class="edit-category-form"><p><strong>Edit ${isSavings ? 'Goal' : 'Category'}</strong></p><div class="input-group"><input type="text" class="edit-name-input" value="${item.name}"><input type="number" class="edit-limit-input" value="${item.limit.toFixed(2)}" min="0" step="0.01"></div>${rolloverControlHTML}<div style="margin-top: 10px; display: flex; gap: 10px;"><button class="save-edit-btn" data-key="${key}">Save</button><button class="cancel-edit-btn" data-key="${key}" style="background-color: #777;">Cancel</button></div></div>`;
                 }
                 
                 const totalContributions = toArray(item.expenses).reduce((sum, exp) => sum + exp.amount, 0); 
@@ -1422,7 +1535,7 @@
         // --- QUICK ADD EXPENSE LISTENER ---
         selectors.quickAddExpenseBtn.addEventListener('click', async () => {
             const spendingCategories = Object.entries(state.budgetedItems || {})
-                .filter(([key, cat]) => cat.type !== 'savings' && !cat.isSinkingFund);
+                .filter(([key, cat]) => cat.type !== 'savings');
             
             if (spendingCategories.length === 0) {
                 alert("Please create at least one spending category before adding an expense.");
@@ -1590,10 +1703,37 @@
         selectors.closeReviewModalBtn.addEventListener('click', () => closeModal(selectors.reviewModal));
         selectors.closeAccountsModalBtn.addEventListener('click', () => closeModal(selectors.accountsModal));
         selectors.closeChallengeModalBtn.addEventListener('click', () => closeModal(selectors.challengeModal));
+        selectors.closeRolloverModalBtn.addEventListener('click', () => closeModal(selectors.rolloverModal));
+        selectors.rolloverSkipBtn.addEventListener('click', () => closeModal(selectors.rolloverModal));
         selectors.challengeCenterBtn.addEventListener('click', () => selectors.challengeModal.style.display = 'flex');
         selectors.noHistoryCloseBtn.addEventListener('click', () => closeModal(selectors.reviewModal));
-        window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeModal(selectors.reviewModal); closeModal(selectors.accountsModal); closeModal(selectors.challengeModal); closeModal(selectors.promptModal); closeModal(selectors.confirmModal); } });
+        window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeModal(selectors.reviewModal); closeModal(selectors.accountsModal); closeModal(selectors.challengeModal); closeModal(selectors.promptModal); closeModal(selectors.confirmModal); closeModal(selectors.rolloverModal); } });
         
+        selectors.rolloverConfirmBtn.addEventListener('click', () => {
+            const updates = {};
+            const items = selectors.rolloverSummaryList.querySelectorAll('.rollover-item');
+            items.forEach(item => {
+                const amount = parseFloat(item.querySelector('.rollover-amount-input').value);
+                const savingsKey = item.querySelector('.rollover-savings-select').value;
+                const categoryName = item.dataset.categoryName;
+
+                if (amount > 0 && savingsKey) {
+                    const newContributionKey = push(ref(db, `budgets/${currentBudgetId}/budgetedItems/${savingsKey}/expenses`)).key;
+                    updates[`/budgetedItems/${savingsKey}/expenses/${newContributionKey}`] = {
+                        amount: amount,
+                        note: `Rollover from ${categoryName}`,
+                        date: new Date().toLocaleDateString(),
+                        isEditing: false
+                    };
+                }
+            });
+
+            if (Object.keys(updates).length > 0) {
+                update(dbRef, updates);
+            }
+            closeModal(selectors.rolloverModal);
+        });
+
         selectors.reviewBtn.addEventListener('click', () => { 
             selectors.reviewRewardsSection.style.display = 'none';
             selectors.reviewExpenseLogSection.style.display = 'none';
@@ -1662,10 +1802,7 @@
                         remove(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}`)); 
                     } else if (type === 'category') { 
                         const updates = {};
-                        // Add the category itself to be removed
                         updates[`/budgetedItems/${key}`] = null;
-
-                        // Check for and remove any linked challenges
                         if (state.activeChallenges) {
                             for (const challengeKey in state.activeChallenges) {
                                 if (state.activeChallenges[challengeKey].targetCategoryKey === key) {
@@ -1673,7 +1810,6 @@
                                 }
                             }
                         }
-                        // Perform the multi-path update
                         update(dbRef, updates);
                     } 
                 } 
@@ -1684,26 +1820,51 @@
             else if (button.classList.contains('edit-btn')) { 
                 if (button.classList.contains('edit-expense-btn')) { 
                     set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses/${expenseKey}/isEditing`), true); 
-                } else { // This is the category/goal header edit button
-                    const currentIsEditing = state.budgetedItems[key]?.isEditing || false;
-                    set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}/isEditing`), !currentIsEditing);
+                } else {
+                    const item = state.budgetedItems[key];
+                    const updates = {};
+                    updates[`/budgetedItems/${key}/isEditing`] = !item.isEditing;
+                    if (item.collapsed) {
+                        updates[`/budgetedItems/${key}/collapsed`] = false;
+                    }
+                    update(dbRef, updates);
                 } 
             } 
             else if (button.classList.contains('save-edit-btn')) { 
-                const form = button.closest('.edit-category-form'); 
-                const newName = form.querySelector('.edit-name-input').value.trim(); 
-                const newLimit = parseFloat(form.querySelector('.edit-limit-input').value);
-                const rolloverCheckbox = form.querySelector('.edit-rollover-toggle');
+                const form = button.closest('.edit-category-form');
+                const item = state.budgetedItems[key];
+                const newName = form.querySelector('.edit-name-input').value.trim();
                 
-                if (newName && newLimit >= 0) {
-                    const updates = { name: newName, limit: newLimit, isEditing: false };
-                    if(rolloverCheckbox) {
-                        updates.rolloverEnabled = rolloverCheckbox.checked;
+                if (item.isSinkingFund) {
+                    const newGoal = parseFloat(form.querySelector('.edit-sf-goal-input').value);
+                    const newMonths = parseInt(form.querySelector('.edit-sf-months-input').value);
+                    if (newName && newGoal > 0 && newMonths > 0) {
+                        const newLimit = newGoal / newMonths;
+                        const updates = {
+                            name: newName,
+                            limit: newLimit,
+                            'sinkingFundData/totalGoal': newGoal,
+                            'sinkingFundData/totalMonths': newMonths,
+                            isEditing: false
+                        };
+                        update(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}`), updates);
+                    } else {
+                        alert('Please enter a valid name, goal, and number of months.');
                     }
-                    update(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}`), updates); 
-                } else { 
-                    alert('Please enter a valid name and limit/goal amount.'); 
-                } 
+                } else {
+                    const newLimit = parseFloat(form.querySelector('.edit-limit-input').value);
+                    const rolloverCheckbox = form.querySelector('.edit-rollover-toggle');
+                    
+                    if (newName && newLimit >= 0) {
+                        const updates = { name: newName, limit: newLimit, isEditing: false };
+                        if(rolloverCheckbox) {
+                            updates.rolloverEnabled = rolloverCheckbox.checked;
+                        }
+                        update(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}`), updates); 
+                    } else { 
+                        alert('Please enter a valid name and limit/goal amount.'); 
+                    }
+                }
             } 
             else if (button.classList.contains('save-edit-expense-btn')) { 
                 const form = button.closest('li'); 
