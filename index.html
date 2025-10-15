@@ -1629,7 +1629,7 @@
                 const totalMonths = parseInt(selectors.sinkingFundMonthsInput.value);
 
                 if (totalGoal > 0 && totalMonths > 0) {
-                    const monthlyLimit = totalGoal / totalMonths;
+                    const monthlyLimit = Math.round(totalGoal / totalMonths);
                     newCategoryData = {
                         name: name,
                         limit: monthlyLimit,
@@ -1839,7 +1839,7 @@
                     const newGoal = parseFloat(form.querySelector('.edit-sf-goal-input').value);
                     const newMonths = parseInt(form.querySelector('.edit-sf-months-input').value);
                     if (newName && newGoal > 0 && newMonths > 0) {
-                        const newLimit = newGoal / newMonths;
+                        const newLimit = Math.round(newGoal / newMonths);
                         const updates = {
                             name: newName,
                             limit: newLimit,
