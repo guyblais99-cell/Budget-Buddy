@@ -626,6 +626,7 @@
             }
         };
 
+        // --- START: NEW HELPER FUNCTIONS ---
         function getLocalDateString() {
             const date = new Date();
             const year = date.getFullYear();
@@ -633,6 +634,36 @@
             const day = date.getDate().toString().padStart(2, '0');
             return `${year}-${month}-${day}`;
         }
+
+        /**
+         * Converts a "YYYY-MM" string into "Month YYYY" (e.g., "November 2025")
+         * @param {string} ymString - The date string in "YYYY-MM" format.
+         * @returns {string} - The formatted date string for display.
+         */
+        function formatYearMonth(ymString) {
+            if (!ymString || ymString.length !== 7) {
+                // Handle potential old data from before this fix
+                if (ymString && ymString.includes(' ')) {
+                    return ymString; 
+                }
+                return "Invalid Date";
+            }
+            const [year, month] = ymString.split('-');
+            // Create a date object. Note: month is 0-indexed in JS Dates (0=Jan, 11=Dec)
+            const date = new Date(year, month - 1); 
+            return date.toLocaleString('default', { month: 'long', year: 'numeric' });
+        }
+
+        /**
+         * Gets the current month in "YYYY-MM" format.
+         * @returns {string} - The current month string (e.g., "2025-11").
+         */
+        function getCurrentYearMonth() {
+            // .toISOString() returns "2025-11-01T...". .slice(0, 7) extracts "2025-11".
+            return new Date().toISOString().slice(0, 7); 
+        }
+        // --- END: NEW HELPER FUNCTIONS ---
+
 
         function toInputDate(dateStr) {
             if (!dateStr) return new Date().toISOString().split('T')[0];
@@ -653,7 +684,25 @@
             }
         }
         
-        function createNewBudget() { return { accountName: 'My Shared Budget', income: {}, monthlyExpenses: {}, budgetedItems: {}, monthYear: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }), incomeSectionCollapsed: true, allocationSectionCollapsed: true, history: {}, activeChallenges: {}, earnedTrophies: {}, challengesEnabled: true, features: { rolloverControlEnabled: false } }; }
+        // --- START: MODIFIED FUNCTION ---
+        function createNewBudget() { 
+            return { 
+                accountName: 'My Shared Budget', 
+                income: {}, 
+                monthlyExpenses: {}, 
+                budgetedItems: {}, 
+                monthYear: getCurrentYearMonth(), // Use "YYYY-MM" format
+                incomeSectionCollapsed: true, 
+                allocationSectionCollapsed: true, 
+                history: {}, 
+                activeChallenges: {}, 
+                earnedTrophies: {}, 
+                challengesEnabled: true, 
+                features: { rolloverControlEnabled: false } 
+            }; 
+        }
+        // --- END: MODIFIED FUNCTION ---
+
         function startNewBudget() { const newBudgetRef = push(ref(db, 'budgets')); const newBudgetId = newBudgetRef.key; set(newBudgetRef, createNewBudget()); connectToBudget(newBudgetId); }
         async function joinBudget() { const budgetId = selectors.joinBudgetIdInput.value.trim(); if (!budgetId) { alert('Please enter a budget ID.'); return; } const budgetRef = ref(db, `budgets/${budgetId}`); const snapshot = await get(budgetRef); if (snapshot.exists()) { connectToBudget(budgetId); } else { alert('Budget ID not found. Please check the ID and try again.'); } }
         
@@ -679,6 +728,21 @@
                         const updates = {};
                         let needsUpdate = false;
 
+                        // --- START: One-time migration for old date format ---
+                        if (state.monthYear && state.monthYear.includes(' ')) {
+                            console.log('Migrating old date format...');
+                            try {
+                                const newMonthYear = new Date(state.monthYear).toISOString().slice(0, 7);
+                                updates['/monthYear'] = newMonthYear;
+                                needsUpdate = true;
+                            } catch (e) {
+                                console.error('Could not migrate date, setting to current month.');
+                                updates['/monthYear'] = getCurrentYearMonth();
+                                needsUpdate = true;
+                            }
+                        }
+                        // --- END: One-time migration ---
+
                         if (state.incomeSectionCollapsed !== true) {
                             updates['/incomeSectionCollapsed'] = true;
                             needsUpdate = true;
@@ -699,13 +763,20 @@
 
                         if (needsUpdate) {
                             update(dbRef, updates);
-                            return;
+                            return; // Data will re-load with the new format
                         }
                     }
 
                     updateDailyChallenges();
 
-                    history = state.history ? Object.values(state.history).sort((a,b) => new Date(b.monthYear).getTime() - new Date(a.monthYear).getTime()) : []; 
+                    // Sort history. Handle both "YYYY-MM" and old "Month YYYY" formats during sort.
+                    history = state.history ? Object.values(state.history).sort((a,b) => {
+                        // Convert "Month YYYY" to a comparable "YYYY-MM"
+                        const dateA = a.monthYear.includes(' ') ? new Date(a.monthYear).toISOString().slice(0, 7) : a.monthYear;
+                        const dateB = b.monthYear.includes(' ') ? new Date(b.monthYear).toISOString().slice(0, 7) : b.monthYear;
+                        return dateB.localeCompare(dateA); // Newest first
+                    }) : [];
+
                     render(); 
                     selectors.onboardingModal.style.display = 'none'; 
                     selectors.appContent.style.display = 'block'; 
@@ -714,11 +785,14 @@
             localStorage.setItem('lastBudgetId', budgetId);
         }
         
+        // --- START: MODIFIED FUNCTION ---
         async function checkForNewMonth(oldState) {
-            const currentMonthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-            if (state.monthYear && new Date(currentMonthYear) > new Date(state.monthYear)) {
+            const currentMonthYear = getCurrentYearMonth(); // "YYYY-MM"
+            
+            // Use simple string comparison. Works on all browsers.
+            if (state.monthYear && currentMonthYear > state.monthYear) {
                 
-                const previousMonthName = state.monthYear;
+                const previousMonthName = formatYearMonth(state.monthYear); // Format for display
                 const evaluatedChallenges = { ...(state.activeChallenges || {}) };
                 const newlyCompletedKeysForTrophy = [];
 
@@ -751,7 +825,8 @@
                 newlyCompletedKeysForTrophy.forEach(key => {
                     const challenge = evaluatedChallenges[key];
                     const newTrophyKey = push(ref(db, `budgets/${currentBudgetId}/earnedTrophies`)).key;
-                    newEarnedTrophies[newTrophyKey] = { ...challenge, archivedMonth: previousMonthName };
+                    // Save the "YYYY-MM" format to the trophy
+                    newEarnedTrophies[newTrophyKey] = { ...challenge, archivedMonth: state.monthYear };
                 });
 
                 const rolloverSummaryData = [];
@@ -768,17 +843,21 @@
                         });
                     }
                     
-                    let newLimit = item.limit;
-                    if (item.type !== 'savings' && item.rolloverEnabled && unspent > 0) {
-                        newLimit = item.limit + unspent;
+                    let newLimit = item.limit; 
+                    let rolloverBalance = 0; 
+
+                    if (item.type !== 'savings' && item.rolloverEnabled) {
+                        rolloverBalance = unspent;
                     }
-                    acc[key] = { ...item, limit: newLimit, expenses: {}, isEditing: false };
+                    
+                    acc[key] = { ...item, limit: newLimit, rolloverBalance: rolloverBalance, expenses: {}, isEditing: false };
+                    
                     return acc;
                 }, {}) : {};
 
                 const newMonthData = {
                     ...state,
-                    monthYear: currentMonthYear,
+                    monthYear: currentMonthYear, // Set new "YYYY-MM"
                     budgetedItems: newBudgets,
                     activeChallenges: {},
                     earnedTrophies: { ...(state.earnedTrophies || {}), ...newEarnedTrophies },
@@ -799,6 +878,7 @@
             }
             return false;
         }
+        // --- END: MODIFIED FUNCTION ---
 
         function showRolloverSummary(previousMonthName, summaryData) {
             if (summaryData.length === 0) {
@@ -929,7 +1009,10 @@
         const calculateTotalMonthlyExpenses = (data) => toArray(data.monthlyExpenses).reduce((sum, item) => sum + item.amount, 0);
         const calculateIncomeAfterBills = (data) => calculateTotalIncome(data) - calculateTotalMonthlyExpenses(data);
         const getItemsByType = (data, type) => toArray(data.budgetedItems).filter(item => item.type === type || (type === 'budget' && !item.type));
+        
         const calculateTotalAllocatedToBudgets = (data) => getItemsByType(data, 'budget').reduce((sum, cat) => sum + cat.limit, 0);
+        const calculateTotalSpendableInBudgets = (data) => getItemsByType(data, 'budget').reduce((sum, cat) => sum + (cat.limit + (cat.rolloverBalance || 0)), 0);
+
         const calculateTotalAllocatedToSavings = (data) => getItemsByType(data, 'savings').reduce((sum, cat) => sum + cat.limit, 0);
         const calculateTotalBudgetedSpending = (data) => getItemsByType(data, 'budget').flatMap(cat => toArray(cat.expenses)).reduce((sum, exp) => sum + exp.amount, 0);
         const calculateTotalContributions = (data) => getItemsByType(data, 'savings').flatMap(cat => toArray(cat.expenses)).reduce((sum, exp) => sum + exp.amount, 0);
@@ -957,11 +1040,13 @@
 
             const incomeAfterBills = calculateIncomeAfterBills(state);
             
-            // --- NEW LOGIC FOR REMAINING TO SPEND ---
-            selectors.remainingToSpend.textContent = currencyFormatter.format(calculateTotalAllocatedToBudgets(state) - calculateTotalBudgetedSpending(state));
+            const totalSpendable = calculateTotalSpendableInBudgets(state);
+            const totalSpending = calculateTotalBudgetedSpending(state);
+            selectors.remainingToSpend.textContent = currencyFormatter.format(totalSpendable - totalSpending);
             
             selectors.summaryTotalIncome.textContent = currencyFormatter.format(calculateTotalIncome(state));
             selectors.summaryTotalExpenses.textContent = currencyFormatter.format(calculateTotalMonthlyExpenses(state));
+            
             const totalAllocatedToBudgets = calculateTotalAllocatedToBudgets(state);
             const totalAllocatedToSavings = calculateTotalAllocatedToSavings(state);
             const remainingToAllocate = incomeAfterBills - totalAllocatedToBudgets - totalAllocatedToSavings;
@@ -988,17 +1073,14 @@
             selectors.remainingToAllocate.textContent = currencyFormatter.format(remainingToAllocate);
 
             if (remainingToAllocate < 0) {
-                // Over-allocated (Red)
                 selectors.remainingToAllocate.style.color = 'var(--expense-color)';
                 selectors.allocationSection.style.borderColor = 'var(--expense-color)';
-                selectors.allocationSection.style.backgroundColor = '#fbe9e7'; // Light red
+                selectors.allocationSection.style.backgroundColor = '#fbe9e7'; 
             } else if (remainingToAllocate > 0) {
-                // Money to allocate (Green)
                 selectors.remainingToAllocate.style.color = 'var(--income-color)';
                 selectors.allocationSection.style.borderColor = 'var(--income-color)';
-                selectors.allocationSection.style.backgroundColor = '#e8f8ef'; // Light green
+                selectors.allocationSection.style.backgroundColor = '#e8f8ef'; 
             } else {
-                // Perfectly allocated (White/transparent)
                 selectors.remainingToAllocate.style.color = 'var(--text-color)';
                 selectors.allocationSection.style.borderColor = 'var(--border-color)';
                 selectors.allocationSection.style.backgroundColor = 'transparent';
@@ -1096,24 +1178,37 @@
                 
                 const totalContributions = toArray(item.expenses).reduce((sum, exp) => sum + exp.amount, 0); 
                 let progressPercent, barColor, overspentPercent = 0, summaryText; 
+                
                 if (isSavings) { 
                     progressPercent = item.limit > 0 ? Math.min(100, 100 * (totalContributions / item.limit)) : 0; 
                     barColor = 'var(--income-color)'; 
                     summaryText = `${currencyFormatter.format(totalContributions)} saved of ${currencyFormatter.format(item.limit)} goal`; 
                 } else { 
-                    const amountLeft = (item.limit - totalContributions); 
-                    summaryText = `${currencyFormatter.format(amountLeft)} left of ${currencyFormatter.format(item.limit)}`; 
+                    const rollover = item.rolloverBalance || 0; 
+                    const effectiveBudget = item.limit + rollover; 
+                    const amountLeft = (effectiveBudget - totalContributions); 
+                    
+                    summaryText = `${currencyFormatter.format(amountLeft)} left of ${currencyFormatter.format(item.limit)}`;
+                    if (rollover !== 0) {
+                        const sign = rollover > 0 ? '+' : '';
+                        summaryText += ` <span style="font-size: 0.9em; color: ${rollover > 0 ? 'var(--income-color)' : 'var(--expense-color)'};">(${sign}${currencyFormatter.format(rollover)})</span>`;
+                    }
 
-                    if (item.limit > 0) {
-                        if (totalContributions <= item.limit) {
+                    if (item.limit > 0) { 
+                        if (amountLeft > 0) {
                             progressPercent = Math.max(0, 100 * (amountLeft / item.limit));
                             overspentPercent = 0;
                         } else {
                             progressPercent = 0;
-                            overspentPercent = Math.min(200, 100 * ((totalContributions - item.limit) / item.limit));
+                            overspentPercent = Math.min(200, 100 * (Math.max(0, totalContributions - effectiveBudget) / item.limit));
                         }
-                    } else {
-                        progressPercent = 100;
+                    } else { 
+                        progressPercent = 0; 
+                        if (totalContributions > 0) {
+                             overspentPercent = 100; 
+                        } else {
+                             overspentPercent = 0;
+                        }
                     }
                     barColor = getColorForPercentage(progressPercent);
                 } 
@@ -1128,7 +1223,7 @@
                 }
 
                 let lastMonthSpendingHTML = '';
-                if (!isSavings && !isSinkingFund && history.length > 0) {
+                if (!isSavings && history.length > 0) { 
                     const lastMonth = history[0];
                     const categoryInHistory = Object.values(lastMonth.budgetedItems || {}).find(cat => cat.name === item.name);
                     if (categoryInHistory) {
@@ -1154,7 +1249,7 @@
                     ${editFormHTML}
                     <div class="budget-summary-text">${summaryText}</div>
                     <div class="progress-bar">
-                        <div class="progress-bar-inner" style="width: ${isSavings ? progressPercent : progressPercent}%; background-color: ${barColor};"></div>
+                        <div class="progress-bar-inner" style="width: ${progressPercent}%; background-color: ${barColor};"></div>
                         ${!isSavings ? `<div class="progress-bar-inner progress-bar-overspent" style="width: ${overspentPercent}%;"></div>` : ''}
                     </div>
                     <div class="budget-category-content">
@@ -1173,11 +1268,47 @@
                 parentList.appendChild(itemDiv); 
             }); 
         }
-    function renderHeader() { const accountName = state.accountName || `Shared Budget`; document.title = `Budgety Buddy - ${accountName}`; selectors.currentAccountName.textContent = accountName; selectors.currentMonth.textContent = state.monthYear; }
+        
+        // --- START: MODIFIED FUNCTION ---
+        function renderHeader() { 
+            const accountName = state.accountName || `Shared Budget`; 
+            document.title = `Budgety Buddy - ${accountName}`; 
+            selectors.currentAccountName.textContent = accountName; 
+            // Use the formatter function for display
+            selectors.currentMonth.textContent = formatYearMonth(state.monthYear); 
+        }
+        // --- END: MODIFIED FUNCTION ---
+
         function createCashflowChart(monthData) { if(cashflowChartInstance) cashflowChartInstance.destroy(); const totalIncome = calculateTotalIncome(monthData); const totalSpending = calculateTotalMonthlyExpenses(monthData) + calculateTotalBudgetedSpending(monthData) + calculateTotalContributions(monthData); const ctx = document.getElementById('cashflow-chart').getContext('2d'); cashflowChartInstance = new Chart(ctx, { type: 'bar', data: { labels: ['Total Income', 'Total Outgoing'], datasets: [{ label: 'Amount', data: [totalIncome, totalSpending], backgroundColor: ['rgba(46, 204, 113, 0.7)', 'rgba(231, 76, 60, 0.7)'], borderColor: ['#2ecc71', '#e74c3c'], borderWidth: 1 }] }, options: { scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } } }); }
         function createSpendingChart(monthData) { if(spendingChartInstance) spendingChartInstance.destroy(); const categorySpending = getItemsByType(monthData, 'budget').map(cat => ({ name: cat.name, total: toArray(cat.expenses).reduce((sum, exp) => sum + exp.amount, 0) })).filter(c => c.total > 0); const ctx = document.getElementById('spending-chart').getContext('2d'); spendingChartInstance = new Chart(ctx, { type: 'pie', data: { labels: categorySpending.map(c => c.name), datasets: [{ data: categorySpending.map(c => c.total), borderWidth: 1 }] }, options: { plugins: { legend: { position: 'bottom' } } } }); }
-        function createComparisonCashflowChart(month1, month2) { if(comparisonCashflowChart) comparisonCashflowChart.destroy(); const totalIncome1 = calculateTotalIncome(month1); const totalOutgoing1 = calculateTotalMonthlyExpenses(month1) + calculateTotalBudgetedSpending(month1) + calculateTotalContributions(month1); const totalIncome2 = calculateTotalIncome(month2); const totalOutgoing2 = calculateTotalMonthlyExpenses(month2) + calculateTotalBudgetedSpending(month2) + calculateTotalContributions(month2); const ctx = document.getElementById('comparison-cashflow-chart').getContext('2d'); comparisonCashflowChart = new Chart(ctx, { type: 'bar', data: { labels: ['Total Income', 'Total Outgoing'], datasets: [ { label: month1.monthYear, data: [totalIncome1, totalOutgoing1], backgroundColor: 'rgba(74, 144, 226, 0.7)', }, { label: month2.monthYear, data: [totalIncome2, totalOutgoing2], backgroundColor: 'rgba(126, 211, 33, 0.7)', } ] } }); }
-        function createComparisonSpendingChart(month1, month2) { if(comparisonSpendingChart) comparisonSpendingChart.destroy(); const spending1 = getItemsByType(month1, 'budget').reduce((acc, cat) => { acc[cat.name] = toArray(cat.expenses).reduce((sum, exp) => sum + exp.amount, 0); return acc; }, {}); const spending2 = getItemsByType(month2, 'budget').reduce((acc, cat) => { acc[cat.name] = toArray(cat.expenses).reduce((sum, exp) => sum + exp.amount, 0); return acc; }, {}); const allCategoryNames = [...new Set([...Object.keys(spending1), ...Object.keys(spending2)])]; const data1 = allCategoryNames.map(name => spending1[name] || 0); const data2 = allCategoryNames.map(name => spending2[name] || 0); const ctx = document.getElementById('comparison-spending-chart').getContext('2d'); comparisonSpendingChart = new Chart(ctx, { type: 'bar', data: { labels: allCategoryNames, datasets: [ { label: month1.monthYear, data: data1, backgroundColor: 'rgba(74, 144, 226, 0.7)', }, { label: month2.monthYear, data: data2, backgroundColor: 'rgba(126, 211, 33, 0.7)', } ] }, options: { indexAxis: 'y' } }); }
+        
+        // --- START: MODIFIED FUNCTION ---
+        function createComparisonCashflowChart(month1, month2) { 
+            if(comparisonCashflowChart) comparisonCashflowChart.destroy(); 
+            const totalIncome1 = calculateTotalIncome(month1); 
+            const totalOutgoing1 = calculateTotalMonthlyExpenses(month1) + calculateTotalBudgetedSpending(month1) + calculateTotalContributions(month1); 
+            const totalIncome2 = calculateTotalIncome(month2); 
+            const totalOutgoing2 = calculateTotalMonthlyExpenses(month2) + calculateTotalBudgetedSpending(month2) + calculateTotalContributions(month2); 
+            const ctx = document.getElementById('comparison-cashflow-chart').getContext('2d'); 
+            comparisonCashflowChart = new Chart(ctx, { type: 'bar', data: { labels: ['Total Income', 'Total Outgoing'], datasets: [ 
+                { label: formatYearMonth(month1.monthYear), data: [totalIncome1, totalOutgoing1], backgroundColor: 'rgba(74, 144, 226, 0.7)', }, 
+                { label: formatYearMonth(month2.monthYear), data: [totalIncome2, totalOutgoing2], backgroundColor: 'rgba(126, 211, 33, 0.7)', } 
+            ] } }); 
+        }
+        function createComparisonSpendingChart(month1, month2) { 
+            if(comparisonSpendingChart) comparisonSpendingChart.destroy(); 
+            const spending1 = getItemsByType(month1, 'budget').reduce((acc, cat) => { acc[cat.name] = toArray(cat.expenses).reduce((sum, exp) => sum + exp.amount, 0); return acc; }, {}); 
+            const spending2 = getItemsByType(month2, 'budget').reduce((acc, cat) => { acc[cat.name] = toArray(cat.expenses).reduce((sum, exp) => sum + exp.amount, 0); return acc; }, {}); 
+            const allCategoryNames = [...new Set([...Object.keys(spending1), ...Object.keys(spending2)])]; 
+            const data1 = allCategoryNames.map(name => spending1[name] || 0); 
+            const data2 = allCategoryNames.map(name => spending2[name] || 0); 
+            const ctx = document.getElementById('comparison-spending-chart').getContext('2d'); 
+            comparisonSpendingChart = new Chart(ctx, { type: 'bar', data: { labels: allCategoryNames, datasets: [ 
+                { label: formatYearMonth(month1.monthYear), data: data1, backgroundColor: 'rgba(74, 144, 226, 0.7)', }, 
+                { label: formatYearMonth(month2.monthYear), data: data2, backgroundColor: 'rgba(126, 211, 33, 0.7)', } 
+            ] }, options: { indexAxis: 'y' } }); 
+        }
+        // --- END: MODIFIED FUNCTION ---
         
         function renderChallenges() {
             renderAvailableChallenges();
@@ -1242,6 +1373,7 @@
             });
         }
 
+        // --- START: MODIFIED FUNCTION ---
         function renderEarnedTrophies() {
             selectors.earnedTrophiesList.innerHTML = '';
             const trophies = state.earnedTrophies || {};
@@ -1252,10 +1384,12 @@
             let html = '';
             Object.values(trophies).sort((a,b) => new Date(b.startDate) - new Date(a.startDate)).forEach(trophy => {
                 const definition = CHALLENGE_DEFINITIONS[trophy.challengeId];
-                 html += `<div class="challenge-item completed"><h4>${definition.badge} ${definition.title} ${trophy.targetCategoryName ? `(${trophy.targetCategoryName})` : ''}</h4><p>Completed: ${trophy.archivedMonth}</p></div>`;
+                 // Use the formatter function for display
+                 html += `<div class="challenge-item completed"><h4>${definition.badge} ${definition.title} ${trophy.targetCategoryName ? `(${trophy.targetCategoryName})` : ''}</h4><p>Completed: ${formatYearMonth(trophy.archivedMonth)}</p></div>`;
             });
             selectors.earnedTrophiesList.innerHTML = html;
         }
+        // --- END: MODIFIED FUNCTION ---
 
         function renderReviewRewards(monthData) {
             const rewardsSection = selectors.reviewRewardsSection;
@@ -1264,6 +1398,7 @@
             rewardsSection.style.display = 'block';
 
             const allTrophiesInHistory = monthData.earnedTrophies || {};
+            // Compare "YYYY-MM" to "YYYY-MM"
             const trophiesForThisMonth = Object.values(allTrophiesInHistory).filter(trophy => trophy.archivedMonth === monthData.monthYear);
 
             if (trophiesForThisMonth.length === 0) {
@@ -1445,39 +1580,36 @@
             Object.entries(activeChallenges).forEach(([key, challenge]) => {
                 if (challenge.status === 'completed') return; // Already done
 
-                // This logic now supports the old call { amount } and the new { oldAmount, newAmount }
                 const { categoryKey, amount, oldAmount = 0, newAmount = (amount || 0) } = expenseChange;
-                const netChange = newAmount - oldAmount; // Calculate the difference
+                const netChange = newAmount - oldAmount; 
                 let newStatus = null;
 
                 if (challenge.challengeId === 'stayUnderBudget' && categoryKey === challenge.targetCategoryKey) {
-                    const newTotal = (challenge.currentAmount || 0) + netChange; // Apply the net change
+                    const newTotal = (challenge.currentAmount || 0) + netChange; 
                     updates[`/activeChallenges/${key}/currentAmount`] = newTotal;
                     
                     if (newTotal > challenge.targetAmount) {
                         if (challenge.status !== 'failed') newStatus = 'failed';
                     } else {
-                        if (challenge.status === 'failed') newStatus = 'active'; // No longer failing
+                        if (challenge.status === 'failed') newStatus = 'active'; 
                     }
                 }
                 
                 if (challenge.challengeId === 'goalBooster' && categoryKey === challenge.targetCategoryKey) {
-                    const newTotal = (challenge.currentAmount || 0) + netChange; // Apply net change
+                    const newTotal = (challenge.currentAmount || 0) + netChange; 
                     updates[`/activeChallenges/${key}/currentAmount`] = newTotal;
                     
                     if (newTotal >= challenge.targetAmount) {
                         if (challenge.status !== 'completed') newStatus = 'completed';
                     } else {
-                        if (challenge.status === 'completed') newStatus = 'active'; // No longer completed
+                        if (challenge.status === 'completed') newStatus = 'active'; 
                     }
                 }
                 
-                // Fail 'noSpend' only if a new expense is added (or edited to be > 0)
                 if (challenge.challengeId === 'noSpend' && categoryKey === challenge.targetCategoryKey && newAmount > 0) {
                     if (challenge.status !== 'failed') newStatus = 'failed';
                 }
                 
-                // Log 'expenseLogger' only if an expense was added/edited (not deleted)
                 if (challenge.challengeId === 'expenseLogger' && newAmount > 0) {
                     if (challenge.lastLogDate !== today) {
                         const newStreak = (challenge.currentStreak || 0) + 1;
@@ -1487,7 +1619,7 @@
                     }
                 }
                 
-                if (newStatus && newStatus !== challenge.status) { // Only update if status actually changed
+                if (newStatus && newStatus !== challenge.status) { 
                     const alertType = (newStatus === 'completed' || newStatus === 'active') ? 'success' : 'failure';
                     if (newStatus === 'completed' && challenge.challengeId !== 'stayUnderBudget') {
                         awardTrophy(key, challenge);
@@ -1687,7 +1819,8 @@
                 collapsed: true, 
                 isEditing: false, 
                 order: newOrder, 
-                type: 'budget' 
+                type: 'budget',
+                rolloverBalance: 0 
             };
             
             push(ref(db, `budgets/${currentBudgetId}/budgetedItems`), finalData); 
@@ -1759,6 +1892,7 @@
             closeModal(selectors.rolloverModal);
         });
 
+        // --- START: MODIFIED FUNCTION ---
         selectors.reviewBtn.addEventListener('click', () => { 
             selectors.reviewRewardsSection.style.display = 'none';
             selectors.reviewExpenseLogSection.style.display = 'none';
@@ -1771,11 +1905,18 @@
                 selectors.chartsArea.style.display = 'grid'; 
                 selectors.reviewControls.style.display = 'block'; 
                 selectors.noHistoryMsg.style.display = 'none'; 
-                history.forEach((month, index) => { const option = document.createElement('option'); option.value = index; option.textContent = month.monthYear; selectors.monthSelect.appendChild(option); }); 
+                history.forEach((month, index) => { 
+                    const option = document.createElement('option'); 
+                    option.value = index; 
+                    // Use the formatter function for display
+                    option.textContent = formatYearMonth(month.monthYear); 
+                    selectors.monthSelect.appendChild(option); 
+                }); 
                 selectors.monthSelect.dispatchEvent(new Event('change')); 
             } 
             selectors.reviewModal.style.display = 'flex'; 
         });
+        // --- END: MODIFIED FUNCTION ---
 
         selectors.monthSelect.addEventListener('change', (e) => { 
             const selectedMonthData = history[e.target.value]; 
@@ -1821,11 +1962,10 @@
                 } else { alert('Please enter a valid amount.'); }
             } 
             else if (button.classList.contains('delete-expense-btn')) { 
-                const oldExpense = state.budgetedItems[categoryKey]?.expenses[expenseKey]; // Get old data
+                const oldExpense = state.budgetedItems[categoryKey]?.expenses[expenseKey]; 
                 if (await showConfirm(`Are you sure you want to delete this entry?`)) { 
                     remove(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses/${expenseKey}`)); 
-                    if (oldExpense) { // Check if we found it
-                        // Call challenge update with oldAmount and newAmount=0
+                    if (oldExpense) { 
                         updateChallengeProgress({ categoryKey, oldAmount: oldExpense.amount, newAmount: 0 }); 
                     }
                 } 
@@ -1906,17 +2046,15 @@
                 const newNote = form.querySelector('.edit-expense-note-input').value.trim();
                 const dateValue = form.querySelector('.edit-expense-date-input').value;
 
-                const oldExpense = state.budgetedItems[categoryKey]?.expenses[expenseKey]; // Get old data
+                const oldExpense = state.budgetedItems[categoryKey]?.expenses[expenseKey]; 
 
                 if (newAmount > 0 && dateValue) { 
                     const newDate = new Date(dateValue + 'T00:00:00').toLocaleDateString();
                     update(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses/${expenseKey}`), { date: newDate, amount: newAmount, note: newNote, isEditing: false }); 
                     
-                    if (oldExpense) { // Check if we found it
-                        // Call challenge update with oldAmount and newAmount
+                    if (oldExpense) { 
                         updateChallengeProgress({ categoryKey, oldAmount: oldExpense.amount, newAmount: newAmount }); 
                     } else {
-                        // Fallback just in case old state wasn't found
                         updateChallengeProgress({ categoryKey, amount: newAmount });
                     }
                 } else { 
