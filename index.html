@@ -641,26 +641,30 @@
          * @returns {string} - The formatted date string for display.
          */
         function formatYearMonth(ymString) {
-            if (!ymString || ymString.length !== 7) {
-                // Handle potential old data from before this fix
-                if (ymString && ymString.includes(' ')) {
-                    return ymString; 
-                }
-                return "Invalid Date";
+            // Check for the new "YYYY-MM" format
+            if (ymString && ymString.length === 7 && ymString.includes('-')) {
+                const [year, month] = ymString.split('-');
+                const date = new Date(year, month - 1); 
+                return date.toLocaleString('default', { month: 'long', year: 'numeric' });
             }
-            const [year, month] = ymString.split('-');
-            // Create a date object. Note: month is 0-indexed in JS Dates (0=Jan, 11=Dec)
-            const date = new Date(year, month - 1); 
-            return date.toLocaleString('default', { month: 'long', year: 'numeric' });
+            // Fallback for the old "Month YYYY" format
+            if (ymString && ymString.includes(' ')) {
+                return ymString; 
+            }
+            // Fallback for any other unexpected data
+            return "Invalid Date";
         }
 
+
         /**
-         * Gets the current month in "YYYY-MM" format.
+         * Gets the current month in "YYYY-MM" format, based on local time.
          * @returns {string} - The current month string (e.g., "2025-11").
          */
         function getCurrentYearMonth() {
-            // .toISOString() returns "2025-11-01T...". .slice(0, 7) extracts "2025-11".
-            return new Date().toISOString().slice(0, 7); 
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = (now.getMonth() + 1).toString().padStart(2, '0');
+            return `${year}-${month}`; // e.g., "2025-11"
         }
         // --- END: NEW HELPER FUNCTIONS ---
 
@@ -715,10 +719,14 @@
                     const oldState = { ...state };
                     state = data; 
                     
-                    // Run rollover check *before* migration check
-                    const monthChanged = await checkForNewMonth(oldState);
+                    // --- START: MODIFIED LOGIC ---
+                    // This function now *only* compares the app's state to the current date.
+                    // It no longer receives `oldState`.
+                    const monthChanged = await checkForNewMonth();
+                    // --- END: MODIFIED LOGIC ---
+                    
                     if (monthChanged) {
-                        return; // Rollover is running, data will reload
+                        return; // The rollover will trigger a new `onValue` load
                     }
 
                     if (isFirstLoad) {
@@ -728,26 +736,21 @@
                         let needsUpdate = false;
 
                         // --- START: One-time migration for old date format ---
+                        // This check is now safe for all devices.
                         if (state.monthYear && state.monthYear.includes(' ')) {
-                            console.log('Migrating old date format...');
-                            const monthMap = {
-                                'January': '01', 'February': '02', 'March': '03', 'April': '04', 'May': '05', 'June': '06',
-                                'July': '07', 'August': '08', 'September': '09', 'October': '10', 'November': '11', 'December': '12'
-                            };
+                            console.log('Migrating old date format safely...');
+                            const monthMap = { "January": "01", "February": "02", "March": "03", "April": "04", "May": "05", "June": "06", "July": "07", "August": "08", "September": "09", "October": "10", "November": "11", "December": "12" };
                             try {
-                                const parts = state.monthYear.split(' '); // e.g., ["October", "2025"]
-                                const month = monthMap[parts[0]];
-                                const year = parts[1];
-                                if (month && year && year.length === 4) {
-                                    const newMonthYear = `${year}-${month}`; // e.g., "2025-10"
+                                const [monthName, year] = state.monthYear.split(' '); // e.g., ["October", "2025"]
+                                if (monthMap[monthName] && year && year.length === 4) {
+                                    const newMonthYear = `${year}-${monthMap[monthName]}`; // "2025-10"
                                     updates['/monthYear'] = newMonthYear;
                                     needsUpdate = true;
-                                    console.log(`Successfully migrated date to ${newMonthYear}`);
                                 } else {
-                                    throw new Error('Invalid old date format found.');
+                                    throw new Error('Could not parse old date string: ' + state.monthYear);
                                 }
                             } catch (e) {
-                                console.error('Could not migrate date, setting to current month.', e.message);
+                                console.error(e.message, 'Setting to current month.');
                                 updates['/monthYear'] = getCurrentYearMonth(); // Safe fallback
                                 needsUpdate = true;
                             }
@@ -780,11 +783,10 @@
 
                     updateDailyChallenges();
 
-                    // Sort history. Handle both "YYYY-MM" and old "Month YYYY" formats during sort.
                     history = state.history ? Object.values(state.history).sort((a,b) => {
                         // Convert "Month YYYY" to a comparable "YYYY-MM"
-                        const dateA = a.monthYear.includes(' ') ? `${new Date(a.monthYear).getFullYear()}-${(new Date(a.monthYear).getMonth() + 1).toString().padStart(2, '0')}` : a.monthYear;
-                        const dateB = b.monthYear.includes(' ') ? `${new Date(b.monthYear).getFullYear()}-${(new Date(b.monthYear).getMonth() + 1).toString().padStart(2, '0')}` : b.monthYear;
+                        const dateA = a.monthYear.includes(' ') ? new Date(a.monthYear).toISOString().slice(0, 7) : a.monthYear;
+                        const dateB = b.monthYear.includes(' ') ? new Date(b.monthYear).toISOString().slice(0, 7) : b.monthYear;
                         return dateB.localeCompare(dateA); // Newest first
                     }) : [];
 
@@ -796,87 +798,24 @@
             localStorage.setItem('lastBudgetId', budgetId);
         }
         
-        async function checkForNewMonth(oldState) {
-            const currentMonthYear = getCurrentYearMonth(); // "YYYY-MM" (e.g., "2025-11")
-
-            // --- START: New "Missed Rollover" Detection ---
-            const sortedHistory = state.history ? Object.values(state.history).sort((a,b) => {
-                const dateA = a.monthYear.includes(' ') ? `${new Date(a.monthYear).getFullYear()}-${(new Date(a.monthYear).getMonth() + 1).toString().padStart(2, '0')}` : a.monthYear;
-                const dateB = b.monthYear.includes(' ') ? `${new Date(b.monthYear).getFullYear()}-${(new Date(b.monthYear).getMonth() + 1).toString().padStart(2, '0')}` : b.monthYear;
-                return dateB.localeCompare(dateA);
-            }) : [];
+        async function checkForNewMonth() {
+            const currentMonthYear = getCurrentYearMonth(); // "YYYY-MM"
             
-            const newestHistoryEntry = sortedHistory.length > 0 ? sortedHistory[0] : null;
-
-            // Helper function to safely parse any date format in history
-            const getHistoryYearMonth = (entry) => {
-                if (!entry) return null;
-                if (entry.monthYear.includes(' ')) {
-                    const monthMap = {
-                        'January': '01', 'February': '02', 'March': '03', 'April': '04', 'May': '05', 'June': '06',
-                        'July': '07', 'August': '08', 'September': '09', 'October': '10', 'November': '11', 'December': '12'
-                    };
-                    const parts = entry.monthYear.split(' ');
-                    const month = monthMap[parts[0]];
-                    const year = parts[1];
-                    return (month && year) ? `${year}-${month}` : null;
-                }
-                return entry.monthYear; // Already in "YYYY-MM" format
-            };
-
-            const newestHistoryMonth = getHistoryYearMonth(newestHistoryEntry);
-            
-            // This is the check for the "stuck" state (e.g., state.monthYear is "2025-11", newestHistoryMonth is "2025-10")
-            const missedARollover = state.monthYear === currentMonthYear && 
-                                    (!newestHistoryMonth || currentMonthYear > newestHistoryMonth);
-
-            // This is the original, normal check for a new month
-            const isNewMonth = state.monthYear && currentMonthYear > state.monthYear;
-            // --- END: New "Missed Rollover" Detection ---
-
-            // Run if EITHER of these conditions is true
-            if (isNewMonth || missedARollover) {
+            // --- START: MODIFIED LOGIC ---
+            // This is the ONLY check that triggers a rollover.
+            // It compares the app's current saved month with the device's actual current month.
+            // --- END: MODIFIED LOGIC ---
+            if (state.monthYear && currentMonthYear > state.monthYear) {
                 
-                // If we're fixing a missed rollover, we must use the *oldState* data,
-                // because the *currentState* data (`state`) is already for the new month.
-                const dataToArchive = missedARollover ? oldState : state;
-
-                // Ensure we don't try to archive an empty/invalid state
-                if (!dataToArchive || !dataToArchive.monthYear) {
-                    console.error("No valid data to archive for rollover.");
-                    if (missedARollover) {
-                        const lastHistoryMonth = newestHistoryMonth;
-                        if (lastHistoryMonth) {
-                            console.log(`Attempting to fix 'stuck' state by reverting month to ${lastHistoryMonth}`);
-                            await set(ref(db, `budgets/${currentBudgetId}/monthYear`), lastHistoryMonth);
-                        }
-                    }
-                    return false; // Stop execution
-                }
-
-                console.log(`Running rollover for ${dataToArchive.monthYear}. Missed Rollover: ${missedARollover}`);
-                
-                // Get the "YYYY-MM" format for the month we are archiving
-                const archiveMonthYear = dataToArchive.monthYear.includes(' ') ? getHistoryYearMonth(dataToArchive) : dataToArchive.monthYear;
-                
-                // Double-check we aren't archiving the same month twice
-                if (archiveMonthYear === newestHistoryMonth) {
-                    console.error("Aborting rollover: Attempted to archive the same month that is already in history.", archiveMonthYear);
-                    // This state is fixed, just force a reload
-                    await set(ref(db, `budgets/${currentBudgetId}/monthYear`), currentMonthYear);
-                    return false;
-                }
-
-
-                const previousMonthName = formatYearMonth(dataToArchive.monthYear);
-                const evaluatedChallenges = { ...(dataToArchive.activeChallenges || {}) };
+                const previousMonthName = formatYearMonth(state.monthYear); // Format for display
+                const evaluatedChallenges = { ...(state.activeChallenges || {}) };
                 const newlyCompletedKeysForTrophy = [];
 
                 Object.entries(evaluatedChallenges).forEach(([key, challenge]) => {
                     if (challenge.status === 'active') {
                         let isCompleted = false;
                         if (challenge.challengeId === 'stayUnderBudget') {
-                            const category = dataToArchive.budgetedItems?.[challenge.targetCategoryKey];
+                            const category = state.budgetedItems?.[challenge.targetCategoryKey];
                             if (category) {
                                 const totalSpent = (category.expenses ? Object.values(category.expenses) : []).reduce((sum, exp) => sum + exp.amount, 0);
                                 if (totalSpent <= challenge.targetAmount) {
@@ -893,22 +832,19 @@
                     }
                 });
 
-                const stateForHistory = { ...dataToArchive, activeChallenges: evaluatedChallenges };
-                delete stateForHistory.history; // Don't nest history
-                stateForHistory.monthYear = archiveMonthYear; // Ensure history has "YYYY-MM"
-                
+                const stateForHistory = { ...state, activeChallenges: evaluatedChallenges };
+                delete stateForHistory.history;
                 const newHistoryKey = push(ref(db, `budgets/${currentBudgetId}/history`)).key;
                 const newHistory = { ...(state.history || {}), [newHistoryKey]: stateForHistory };
-                
                 const newEarnedTrophies = {};
                 newlyCompletedKeysForTrophy.forEach(key => {
                     const challenge = evaluatedChallenges[key];
                     const newTrophyKey = push(ref(db, `budgets/${currentBudgetId}/earnedTrophies`)).key;
-                    newEarnedTrophies[newTrophyKey] = { ...challenge, archivedMonth: archiveMonthYear };
+                    newEarnedTrophies[newTrophyKey] = { ...challenge, archivedMonth: state.monthYear };
                 });
 
                 const rolloverSummaryData = [];
-                const newBudgets = dataToArchive.budgetedItems ? Object.entries(dataToArchive.budgetedItems).reduce((acc, [key, item]) => {
+                const newBudgets = state.budgetedItems ? Object.entries(state.budgetedItems).reduce((acc, [key, item]) => {
                     const totalSpent = (item.expenses ? Object.values(item.expenses) : []).reduce((sum, exp) => sum + exp.amount, 0);
                     const unspent = item.limit - totalSpent;
                     
@@ -928,50 +864,16 @@
                         rolloverBalance = unspent;
                     }
                     
-                    // If we are *fixing* a missed rollover, we must merge the old item
-                    // with any potential new data from the *current* state (e.g., if the user
-                    // already added expenses for November).
-                    const currentItemData = state.budgetedItems?.[key] || {};
-                    
-                    acc[key] = { 
-                        ...item, // Base data from last month
-                        ...currentItemData, // Overlay any new data (like November expenses)
-                        limit: newLimit, // Set the correct limit
-                        rolloverBalance: rolloverBalance, // Set the correct rollover
-                        expenses: currentItemData.expenses || {}, // IMPORTANT: Keep new month's expenses
-                        isEditing: false 
-                    };
+                    acc[key] = { ...item, limit: newLimit, rolloverBalance: rolloverBalance, expenses: {}, isEditing: false };
                     
                     return acc;
                 }, {}) : {};
 
-                // If we are *not* fixing, we also need to account for items added in the new month
-                // that didn't exist in the old month.
-                if (!missedARollover) {
-                     for (const key in state.budgetedItems) {
-                        if (!newBudgets[key]) {
-                            console.log(`Bringing forward new category: ${state.budgetedItems[key].name}`);
-                            newBudgets[key] = state.budgetedItems[key];
-                        }
-                     }
-                }
-
-                // Make sure to preserve any new categories added in the current (stuck) month
-                if (missedARollover) {
-                    for (const key in state.budgetedItems) {
-                        if (!newBudgets[key]) {
-                            console.log(`Bringing forward new category from stuck month: ${state.budgetedItems[key].name}`);
-                            newBudgets[key] = state.budgetedItems[key];
-                        }
-                    }
-                }
-
-
                 const newMonthData = {
-                    ...state, 
-                    monthYear: currentMonthYear, 
-                    budgetedItems: newBudgets, 
-                    activeChallenges: {}, 
+                    ...state,
+                    monthYear: currentMonthYear, // Set new "YYYY-MM"
+                    budgetedItems: newBudgets,
+                    activeChallenges: {},
                     earnedTrophies: { ...(state.earnedTrophies || {}), ...newEarnedTrophies },
                     history: newHistory,
                 };
@@ -986,9 +888,9 @@
                         showChallengeAlert(`Congratulations! You completed the ${challengeNames} challenge for ${previousMonthName} and earned a new trophy!`);
                     }, 500);
                 }
-                return true; // A rollover (or fix) was performed
+                return true;
             }
-            return false; // No rollover needed
+            return false;
         }
 
         function showRolloverSummary(previousMonthName, summaryData) {
@@ -1379,7 +1281,6 @@
                 parentList.appendChild(itemDiv); 
             }); 
         }
-
         function renderHeader() { 
             const accountName = state.accountName || `Shared Budget`; 
             document.title = `Budgety Buddy - ${accountName}`; 
