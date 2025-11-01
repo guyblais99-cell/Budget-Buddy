@@ -684,7 +684,6 @@
             }
         }
         
-        // --- START: MODIFIED FUNCTION ---
         function createNewBudget() { 
             return { 
                 accountName: 'My Shared Budget', 
@@ -701,7 +700,6 @@
                 features: { rolloverControlEnabled: false } 
             }; 
         }
-        // --- END: MODIFIED FUNCTION ---
 
         function startNewBudget() { const newBudgetRef = push(ref(db, 'budgets')); const newBudgetId = newBudgetRef.key; set(newBudgetRef, createNewBudget()); connectToBudget(newBudgetId); }
         async function joinBudget() { const budgetId = selectors.joinBudgetIdInput.value.trim(); if (!budgetId) { alert('Please enter a budget ID.'); return; } const budgetRef = ref(db, `budgets/${budgetId}`); const snapshot = await get(budgetRef); if (snapshot.exists()) { connectToBudget(budgetId); } else { alert('Budget ID not found. Please check the ID and try again.'); } }
@@ -717,9 +715,10 @@
                     const oldState = { ...state };
                     state = data; 
                     
+                    // Run rollover check *before* migration check
                     const monthChanged = await checkForNewMonth(oldState);
                     if (monthChanged) {
-                        return;
+                        return; // Rollover is running, data will reload
                     }
 
                     if (isFirstLoad) {
@@ -731,13 +730,25 @@
                         // --- START: One-time migration for old date format ---
                         if (state.monthYear && state.monthYear.includes(' ')) {
                             console.log('Migrating old date format...');
+                            const monthMap = {
+                                'January': '01', 'February': '02', 'March': '03', 'April': '04', 'May': '05', 'June': '06',
+                                'July': '07', 'August': '08', 'September': '09', 'October': '10', 'November': '11', 'December': '12'
+                            };
                             try {
-                                const newMonthYear = new Date(state.monthYear).toISOString().slice(0, 7);
-                                updates['/monthYear'] = newMonthYear;
-                                needsUpdate = true;
+                                const parts = state.monthYear.split(' '); // e.g., ["October", "2025"]
+                                const month = monthMap[parts[0]];
+                                const year = parts[1];
+                                if (month && year && year.length === 4) {
+                                    const newMonthYear = `${year}-${month}`; // e.g., "2025-10"
+                                    updates['/monthYear'] = newMonthYear;
+                                    needsUpdate = true;
+                                    console.log(`Successfully migrated date to ${newMonthYear}`);
+                                } else {
+                                    throw new Error('Invalid old date format found.');
+                                }
                             } catch (e) {
-                                console.error('Could not migrate date, setting to current month.');
-                                updates['/monthYear'] = getCurrentYearMonth();
+                                console.error('Could not migrate date, setting to current month.', e.message);
+                                updates['/monthYear'] = getCurrentYearMonth(); // Safe fallback
                                 needsUpdate = true;
                             }
                         }
@@ -772,8 +783,8 @@
                     // Sort history. Handle both "YYYY-MM" and old "Month YYYY" formats during sort.
                     history = state.history ? Object.values(state.history).sort((a,b) => {
                         // Convert "Month YYYY" to a comparable "YYYY-MM"
-                        const dateA = a.monthYear.includes(' ') ? new Date(a.monthYear).toISOString().slice(0, 7) : a.monthYear;
-                        const dateB = b.monthYear.includes(' ') ? new Date(b.monthYear).toISOString().slice(0, 7) : b.monthYear;
+                        const dateA = a.monthYear.includes(' ') ? `${new Date(a.monthYear).getFullYear()}-${(new Date(a.monthYear).getMonth() + 1).toString().padStart(2, '0')}` : a.monthYear;
+                        const dateB = b.monthYear.includes(' ') ? `${new Date(b.monthYear).getFullYear()}-${(new Date(b.monthYear).getMonth() + 1).toString().padStart(2, '0')}` : b.monthYear;
                         return dateB.localeCompare(dateA); // Newest first
                     }) : [];
 
@@ -785,22 +796,87 @@
             localStorage.setItem('lastBudgetId', budgetId);
         }
         
-        // --- START: MODIFIED FUNCTION ---
         async function checkForNewMonth(oldState) {
-            const currentMonthYear = getCurrentYearMonth(); // "YYYY-MM"
+            const currentMonthYear = getCurrentYearMonth(); // "YYYY-MM" (e.g., "2025-11")
+
+            // --- START: New "Missed Rollover" Detection ---
+            const sortedHistory = state.history ? Object.values(state.history).sort((a,b) => {
+                const dateA = a.monthYear.includes(' ') ? `${new Date(a.monthYear).getFullYear()}-${(new Date(a.monthYear).getMonth() + 1).toString().padStart(2, '0')}` : a.monthYear;
+                const dateB = b.monthYear.includes(' ') ? `${new Date(b.monthYear).getFullYear()}-${(new Date(b.monthYear).getMonth() + 1).toString().padStart(2, '0')}` : b.monthYear;
+                return dateB.localeCompare(dateA);
+            }) : [];
             
-            // Use simple string comparison. Works on all browsers.
-            if (state.monthYear && currentMonthYear > state.monthYear) {
+            const newestHistoryEntry = sortedHistory.length > 0 ? sortedHistory[0] : null;
+
+            // Helper function to safely parse any date format in history
+            const getHistoryYearMonth = (entry) => {
+                if (!entry) return null;
+                if (entry.monthYear.includes(' ')) {
+                    const monthMap = {
+                        'January': '01', 'February': '02', 'March': '03', 'April': '04', 'May': '05', 'June': '06',
+                        'July': '07', 'August': '08', 'September': '09', 'October': '10', 'November': '11', 'December': '12'
+                    };
+                    const parts = entry.monthYear.split(' ');
+                    const month = monthMap[parts[0]];
+                    const year = parts[1];
+                    return (month && year) ? `${year}-${month}` : null;
+                }
+                return entry.monthYear; // Already in "YYYY-MM" format
+            };
+
+            const newestHistoryMonth = getHistoryYearMonth(newestHistoryEntry);
+            
+            // This is the check for the "stuck" state (e.g., state.monthYear is "2025-11", newestHistoryMonth is "2025-10")
+            const missedARollover = state.monthYear === currentMonthYear && 
+                                    (!newestHistoryMonth || currentMonthYear > newestHistoryMonth);
+
+            // This is the original, normal check for a new month
+            const isNewMonth = state.monthYear && currentMonthYear > state.monthYear;
+            // --- END: New "Missed Rollover" Detection ---
+
+            // Run if EITHER of these conditions is true
+            if (isNewMonth || missedARollover) {
                 
-                const previousMonthName = formatYearMonth(state.monthYear); // Format for display
-                const evaluatedChallenges = { ...(state.activeChallenges || {}) };
+                // If we're fixing a missed rollover, we must use the *oldState* data,
+                // because the *currentState* data (`state`) is already for the new month.
+                const dataToArchive = missedARollover ? oldState : state;
+
+                // Ensure we don't try to archive an empty/invalid state
+                if (!dataToArchive || !dataToArchive.monthYear) {
+                    console.error("No valid data to archive for rollover.");
+                    if (missedARollover) {
+                        const lastHistoryMonth = newestHistoryMonth;
+                        if (lastHistoryMonth) {
+                            console.log(`Attempting to fix 'stuck' state by reverting month to ${lastHistoryMonth}`);
+                            await set(ref(db, `budgets/${currentBudgetId}/monthYear`), lastHistoryMonth);
+                        }
+                    }
+                    return false; // Stop execution
+                }
+
+                console.log(`Running rollover for ${dataToArchive.monthYear}. Missed Rollover: ${missedARollover}`);
+                
+                // Get the "YYYY-MM" format for the month we are archiving
+                const archiveMonthYear = dataToArchive.monthYear.includes(' ') ? getHistoryYearMonth(dataToArchive) : dataToArchive.monthYear;
+                
+                // Double-check we aren't archiving the same month twice
+                if (archiveMonthYear === newestHistoryMonth) {
+                    console.error("Aborting rollover: Attempted to archive the same month that is already in history.", archiveMonthYear);
+                    // This state is fixed, just force a reload
+                    await set(ref(db, `budgets/${currentBudgetId}/monthYear`), currentMonthYear);
+                    return false;
+                }
+
+
+                const previousMonthName = formatYearMonth(dataToArchive.monthYear);
+                const evaluatedChallenges = { ...(dataToArchive.activeChallenges || {}) };
                 const newlyCompletedKeysForTrophy = [];
 
                 Object.entries(evaluatedChallenges).forEach(([key, challenge]) => {
                     if (challenge.status === 'active') {
                         let isCompleted = false;
                         if (challenge.challengeId === 'stayUnderBudget') {
-                            const category = state.budgetedItems?.[challenge.targetCategoryKey];
+                            const category = dataToArchive.budgetedItems?.[challenge.targetCategoryKey];
                             if (category) {
                                 const totalSpent = (category.expenses ? Object.values(category.expenses) : []).reduce((sum, exp) => sum + exp.amount, 0);
                                 if (totalSpent <= challenge.targetAmount) {
@@ -817,20 +893,22 @@
                     }
                 });
 
-                const stateForHistory = { ...state, activeChallenges: evaluatedChallenges };
-                delete stateForHistory.history;
+                const stateForHistory = { ...dataToArchive, activeChallenges: evaluatedChallenges };
+                delete stateForHistory.history; // Don't nest history
+                stateForHistory.monthYear = archiveMonthYear; // Ensure history has "YYYY-MM"
+                
                 const newHistoryKey = push(ref(db, `budgets/${currentBudgetId}/history`)).key;
                 const newHistory = { ...(state.history || {}), [newHistoryKey]: stateForHistory };
+                
                 const newEarnedTrophies = {};
                 newlyCompletedKeysForTrophy.forEach(key => {
                     const challenge = evaluatedChallenges[key];
                     const newTrophyKey = push(ref(db, `budgets/${currentBudgetId}/earnedTrophies`)).key;
-                    // Save the "YYYY-MM" format to the trophy
-                    newEarnedTrophies[newTrophyKey] = { ...challenge, archivedMonth: state.monthYear };
+                    newEarnedTrophies[newTrophyKey] = { ...challenge, archivedMonth: archiveMonthYear };
                 });
 
                 const rolloverSummaryData = [];
-                const newBudgets = state.budgetedItems ? Object.entries(state.budgetedItems).reduce((acc, [key, item]) => {
+                const newBudgets = dataToArchive.budgetedItems ? Object.entries(dataToArchive.budgetedItems).reduce((acc, [key, item]) => {
                     const totalSpent = (item.expenses ? Object.values(item.expenses) : []).reduce((sum, exp) => sum + exp.amount, 0);
                     const unspent = item.limit - totalSpent;
                     
@@ -850,16 +928,50 @@
                         rolloverBalance = unspent;
                     }
                     
-                    acc[key] = { ...item, limit: newLimit, rolloverBalance: rolloverBalance, expenses: {}, isEditing: false };
+                    // If we are *fixing* a missed rollover, we must merge the old item
+                    // with any potential new data from the *current* state (e.g., if the user
+                    // already added expenses for November).
+                    const currentItemData = state.budgetedItems?.[key] || {};
+                    
+                    acc[key] = { 
+                        ...item, // Base data from last month
+                        ...currentItemData, // Overlay any new data (like November expenses)
+                        limit: newLimit, // Set the correct limit
+                        rolloverBalance: rolloverBalance, // Set the correct rollover
+                        expenses: currentItemData.expenses || {}, // IMPORTANT: Keep new month's expenses
+                        isEditing: false 
+                    };
                     
                     return acc;
                 }, {}) : {};
 
+                // If we are *not* fixing, we also need to account for items added in the new month
+                // that didn't exist in the old month.
+                if (!missedARollover) {
+                     for (const key in state.budgetedItems) {
+                        if (!newBudgets[key]) {
+                            console.log(`Bringing forward new category: ${state.budgetedItems[key].name}`);
+                            newBudgets[key] = state.budgetedItems[key];
+                        }
+                     }
+                }
+
+                // Make sure to preserve any new categories added in the current (stuck) month
+                if (missedARollover) {
+                    for (const key in state.budgetedItems) {
+                        if (!newBudgets[key]) {
+                            console.log(`Bringing forward new category from stuck month: ${state.budgetedItems[key].name}`);
+                            newBudgets[key] = state.budgetedItems[key];
+                        }
+                    }
+                }
+
+
                 const newMonthData = {
-                    ...state,
-                    monthYear: currentMonthYear, // Set new "YYYY-MM"
-                    budgetedItems: newBudgets,
-                    activeChallenges: {},
+                    ...state, 
+                    monthYear: currentMonthYear, 
+                    budgetedItems: newBudgets, 
+                    activeChallenges: {}, 
                     earnedTrophies: { ...(state.earnedTrophies || {}), ...newEarnedTrophies },
                     history: newHistory,
                 };
@@ -874,11 +986,10 @@
                         showChallengeAlert(`Congratulations! You completed the ${challengeNames} challenge for ${previousMonthName} and earned a new trophy!`);
                     }, 500);
                 }
-                return true;
+                return true; // A rollover (or fix) was performed
             }
-            return false;
+            return false; // No rollover needed
         }
-        // --- END: MODIFIED FUNCTION ---
 
         function showRolloverSummary(previousMonthName, summaryData) {
             if (summaryData.length === 0) {
@@ -1268,21 +1379,17 @@
                 parentList.appendChild(itemDiv); 
             }); 
         }
-        
-        // --- START: MODIFIED FUNCTION ---
+
         function renderHeader() { 
             const accountName = state.accountName || `Shared Budget`; 
             document.title = `Budgety Buddy - ${accountName}`; 
             selectors.currentAccountName.textContent = accountName; 
-            // Use the formatter function for display
             selectors.currentMonth.textContent = formatYearMonth(state.monthYear); 
         }
-        // --- END: MODIFIED FUNCTION ---
 
         function createCashflowChart(monthData) { if(cashflowChartInstance) cashflowChartInstance.destroy(); const totalIncome = calculateTotalIncome(monthData); const totalSpending = calculateTotalMonthlyExpenses(monthData) + calculateTotalBudgetedSpending(monthData) + calculateTotalContributions(monthData); const ctx = document.getElementById('cashflow-chart').getContext('2d'); cashflowChartInstance = new Chart(ctx, { type: 'bar', data: { labels: ['Total Income', 'Total Outgoing'], datasets: [{ label: 'Amount', data: [totalIncome, totalSpending], backgroundColor: ['rgba(46, 204, 113, 0.7)', 'rgba(231, 76, 60, 0.7)'], borderColor: ['#2ecc71', '#e74c3c'], borderWidth: 1 }] }, options: { scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } } }); }
         function createSpendingChart(monthData) { if(spendingChartInstance) spendingChartInstance.destroy(); const categorySpending = getItemsByType(monthData, 'budget').map(cat => ({ name: cat.name, total: toArray(cat.expenses).reduce((sum, exp) => sum + exp.amount, 0) })).filter(c => c.total > 0); const ctx = document.getElementById('spending-chart').getContext('2d'); spendingChartInstance = new Chart(ctx, { type: 'pie', data: { labels: categorySpending.map(c => c.name), datasets: [{ data: categorySpending.map(c => c.total), borderWidth: 1 }] }, options: { plugins: { legend: { position: 'bottom' } } } }); }
         
-        // --- START: MODIFIED FUNCTION ---
         function createComparisonCashflowChart(month1, month2) { 
             if(comparisonCashflowChart) comparisonCashflowChart.destroy(); 
             const totalIncome1 = calculateTotalIncome(month1); 
@@ -1308,7 +1415,6 @@
                 { label: formatYearMonth(month2.monthYear), data: data2, backgroundColor: 'rgba(126, 211, 33, 0.7)', } 
             ] }, options: { indexAxis: 'y' } }); 
         }
-        // --- END: MODIFIED FUNCTION ---
         
         function renderChallenges() {
             renderAvailableChallenges();
@@ -1373,7 +1479,6 @@
             });
         }
 
-        // --- START: MODIFIED FUNCTION ---
         function renderEarnedTrophies() {
             selectors.earnedTrophiesList.innerHTML = '';
             const trophies = state.earnedTrophies || {};
@@ -1384,12 +1489,10 @@
             let html = '';
             Object.values(trophies).sort((a,b) => new Date(b.startDate) - new Date(a.startDate)).forEach(trophy => {
                 const definition = CHALLENGE_DEFINITIONS[trophy.challengeId];
-                 // Use the formatter function for display
                  html += `<div class="challenge-item completed"><h4>${definition.badge} ${definition.title} ${trophy.targetCategoryName ? `(${trophy.targetCategoryName})` : ''}</h4><p>Completed: ${formatYearMonth(trophy.archivedMonth)}</p></div>`;
             });
             selectors.earnedTrophiesList.innerHTML = html;
         }
-        // --- END: MODIFIED FUNCTION ---
 
         function renderReviewRewards(monthData) {
             const rewardsSection = selectors.reviewRewardsSection;
@@ -1398,7 +1501,6 @@
             rewardsSection.style.display = 'block';
 
             const allTrophiesInHistory = monthData.earnedTrophies || {};
-            // Compare "YYYY-MM" to "YYYY-MM"
             const trophiesForThisMonth = Object.values(allTrophiesInHistory).filter(trophy => trophy.archivedMonth === monthData.monthYear);
 
             if (trophiesForThisMonth.length === 0) {
@@ -1578,7 +1680,7 @@
             const today = getLocalDateString();
 
             Object.entries(activeChallenges).forEach(([key, challenge]) => {
-                if (challenge.status === 'completed') return; // Already done
+                if (challenge.status === 'completed') return; 
 
                 const { categoryKey, amount, oldAmount = 0, newAmount = (amount || 0) } = expenseChange;
                 const netChange = newAmount - oldAmount; 
@@ -1660,7 +1762,7 @@
             } else {
                 const updates = {};
                 updates[`/activeChallenges/${challengeKey}/currentStreak`] = newStreak;
-                updates[`/activeChallenges/${challengeKey}/lastLogDate`] = todayStr;
+                updates[`/activeChallenges/${key}/lastLogDate`] = todayStr;
                 await update(dbRef, updates);
             }
 
@@ -1892,7 +1994,6 @@
             closeModal(selectors.rolloverModal);
         });
 
-        // --- START: MODIFIED FUNCTION ---
         selectors.reviewBtn.addEventListener('click', () => { 
             selectors.reviewRewardsSection.style.display = 'none';
             selectors.reviewExpenseLogSection.style.display = 'none';
@@ -1908,7 +2009,6 @@
                 history.forEach((month, index) => { 
                     const option = document.createElement('option'); 
                     option.value = index; 
-                    // Use the formatter function for display
                     option.textContent = formatYearMonth(month.monthYear); 
                     selectors.monthSelect.appendChild(option); 
                 }); 
@@ -1916,7 +2016,6 @@
             } 
             selectors.reviewModal.style.display = 'flex'; 
         });
-        // --- END: MODIFIED FUNCTION ---
 
         selectors.monthSelect.addEventListener('change', (e) => { 
             const selectedMonthData = history[e.target.value]; 
@@ -2082,3 +2181,4 @@
     </script>
 </body>
 </html>
+
