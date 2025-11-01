@@ -636,35 +636,40 @@
         }
 
         /**
-         * Converts a "YYYY-MM" string into "Month YYYY" (e.g., "November 2025")
-         * @param {string} ymString - The date string in "YYYY-MM" format.
+         * Converts a "YYYY-MM" string or "Month YYYY" string into "Month YYYY" (e.g., "November 2025")
+         * @param {string} ymString - The date string in "YYYY-MM" or "Month YYYY" format.
          * @returns {string} - The formatted date string for display.
          */
         function formatYearMonth(ymString) {
-            // Check for the new "YYYY-MM" format
-            if (ymString && ymString.length === 7 && ymString.includes('-')) {
+            if (!ymString) return "Invalid Date";
+            
+            // Handle old "Month YYYY" format if it still exists in history
+            if (ymString.includes(' ')) {
+                // Check if it's a valid date string before returning
+                if (!isNaN(new Date(ymString).getTime())) {
+                    return ymString;
+                }
+            }
+            
+            // Handle new "YYYY-MM" format
+            if (ymString.length === 7 && ymString.includes('-')) {
                 const [year, month] = ymString.split('-');
+                // Create a date object. Note: month is 0-indexed in JS Dates (0=Jan, 11=Dec)
                 const date = new Date(year, month - 1); 
-                return date.toLocaleString('default', { month: 'long', year: 'numeric' });
+                if (!isNaN(date.getTime())) {
+                    return date.toLocaleString('default', { month: 'long', year: 'numeric' });
+                }
             }
-            // Fallback for the old "Month YYYY" format
-            if (ymString && ymString.includes(' ')) {
-                return ymString; 
-            }
-            // Fallback for any other unexpected data
-            return "Invalid Date";
+            return "Invalid Date"; // Fallback
         }
 
-
         /**
-         * Gets the current month in "YYYY-MM" format, based on local time.
+         * Gets the current month in "YYYY-MM" format.
          * @returns {string} - The current month string (e.g., "2025-11").
          */
         function getCurrentYearMonth() {
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = (now.getMonth() + 1).toString().padStart(2, '0');
-            return `${year}-${month}`; // e.g., "2025-11"
+            // .toISOString() returns "2025-11-01T...". .slice(0, 7) extracts "2025-11".
+            return new Date().toISOString().slice(0, 7); 
         }
         // --- END: NEW HELPER FUNCTIONS ---
 
@@ -688,6 +693,7 @@
             }
         }
         
+        // --- START: MODIFIED FUNCTION ---
         function createNewBudget() { 
             return { 
                 accountName: 'My Shared Budget', 
@@ -704,6 +710,7 @@
                 features: { rolloverControlEnabled: false } 
             }; 
         }
+        // --- END: MODIFIED FUNCTION ---
 
         function startNewBudget() { const newBudgetRef = push(ref(db, 'budgets')); const newBudgetId = newBudgetRef.key; set(newBudgetRef, createNewBudget()); connectToBudget(newBudgetId); }
         async function joinBudget() { const budgetId = selectors.joinBudgetIdInput.value.trim(); if (!budgetId) { alert('Please enter a budget ID.'); return; } const budgetRef = ref(db, `budgets/${budgetId}`); const snapshot = await get(budgetRef); if (snapshot.exists()) { connectToBudget(budgetId); } else { alert('Budget ID not found. Please check the ID and try again.'); } }
@@ -719,14 +726,54 @@
                     const oldState = { ...state };
                     state = data; 
                     
-                    // --- START: MODIFIED LOGIC ---
-                    // This function now *only* compares the app's state to the current date.
-                    // It no longer receives `oldState`.
-                    const monthChanged = await checkForNewMonth();
-                    // --- END: MODIFIED LOGIC ---
+                    // --- START: One-time migration for old date format ---
+                    if (isFirstLoad && state.monthYear && state.monthYear.includes(' ')) {
+                        console.log('Migrating old date format...');
+                        const updates = {};
+                        let newMonthYear;
+                        try {
+                            // --- NEW ROBUST MIGRATION (Works on iOS) ---
+                            const parts = state.monthYear.split(' ');
+                            const monthName = parts[0];
+                            const year = parts[1];
+                            // `Date.parse` with this format is universally supported
+                            const monthIndex = new Date(Date.parse(monthName +" 1, 2012")).getMonth();
+                            const monthNumber = (monthIndex + 1).toString().padStart(2, '0');
+                            newMonthYear = `${year}-${monthNumber}`;
+                            // --- END ROBUST MIGRATION ---
+
+                            updates['/monthYear'] = newMonthYear;
+                        } catch (e) {
+                            console.error('Could not migrate date, setting to current month.');
+                            updates['/monthYear'] = getCurrentYearMonth();
+                        }
+                        
+                        // Also check history for old formats
+                        if(state.history) {
+                            Object.entries(state.history).forEach(([key, monthData]) => {
+                                if(monthData.monthYear && monthData.monthYear.includes(' ')) {
+                                    try {
+                                        const parts = monthData.monthYear.split(' ');
+                                        const monthName = parts[0];
+                                        const year = parts[1];
+                                        const monthIndex = new Date(Date.parse(monthName +" 1, 2012")).getMonth();
+                                        const monthNumber = (monthIndex + 1).toString().padStart(2, '0');
+                                        updates[`/history/${key}/monthYear`] = `${year}-${monthNumber}`;
+                                    } catch(e) {
+                                        console.warn(`Could not migrate history date: ${monthData.monthYear}`);
+                                    }
+                                }
+                            });
+                        }
+                        
+                        update(dbRef, updates);
+                        return; // Data will re-load with the new format
+                    }
+                    // --- END: One-time migration ---
                     
+                    const monthChanged = await checkForNewMonth(oldState);
                     if (monthChanged) {
-                        return; // The rollover will trigger a new `onValue` load
+                        return;
                     }
 
                     if (isFirstLoad) {
@@ -734,28 +781,6 @@
                         
                         const updates = {};
                         let needsUpdate = false;
-
-                        // --- START: One-time migration for old date format ---
-                        // This check is now safe for all devices.
-                        if (state.monthYear && state.monthYear.includes(' ')) {
-                            console.log('Migrating old date format safely...');
-                            const monthMap = { "January": "01", "February": "02", "March": "03", "April": "04", "May": "05", "June": "06", "July": "07", "August": "08", "September": "09", "October": "10", "November": "11", "December": "12" };
-                            try {
-                                const [monthName, year] = state.monthYear.split(' '); // e.g., ["October", "2025"]
-                                if (monthMap[monthName] && year && year.length === 4) {
-                                    const newMonthYear = `${year}-${monthMap[monthName]}`; // "2025-10"
-                                    updates['/monthYear'] = newMonthYear;
-                                    needsUpdate = true;
-                                } else {
-                                    throw new Error('Could not parse old date string: ' + state.monthYear);
-                                }
-                            } catch (e) {
-                                console.error(e.message, 'Setting to current month.');
-                                updates['/monthYear'] = getCurrentYearMonth(); // Safe fallback
-                                needsUpdate = true;
-                            }
-                        }
-                        // --- END: One-time migration ---
 
                         if (state.incomeSectionCollapsed !== true) {
                             updates['/incomeSectionCollapsed'] = true;
@@ -777,16 +802,21 @@
 
                         if (needsUpdate) {
                             update(dbRef, updates);
-                            return; // Data will re-load with the new format
+                            return;
                         }
                     }
 
                     updateDailyChallenges();
 
+                    // Sort history. Handle both "YYYY-MM" and old "Month YYYY" formats during sort.
                     history = state.history ? Object.values(state.history).sort((a,b) => {
-                        // Convert "Month YYYY" to a comparable "YYYY-MM"
-                        const dateA = a.monthYear.includes(' ') ? new Date(a.monthYear).toISOString().slice(0, 7) : a.monthYear;
-                        const dateB = b.monthYear.includes(' ') ? new Date(b.monthYear).toISOString().slice(0, 7) : b.monthYear;
+                        // Convert any potential old "Month YYYY" to "YYYY-MM" for sorting
+                        const dateA = a.monthYear.includes(' ') 
+                            ? new Date(a.monthYear).toISOString().slice(0, 7) 
+                            : a.monthYear;
+                        const dateB = b.monthYear.includes(' ') 
+                            ? new Date(b.monthYear).toISOString().slice(0, 7) 
+                            : b.monthYear;
                         return dateB.localeCompare(dateA); // Newest first
                     }) : [];
 
@@ -798,13 +828,11 @@
             localStorage.setItem('lastBudgetId', budgetId);
         }
         
-        async function checkForNewMonth() {
+        // --- START: MODIFIED FUNCTION ---
+        async function checkForNewMonth(oldState) {
             const currentMonthYear = getCurrentYearMonth(); // "YYYY-MM"
             
-            // --- START: MODIFIED LOGIC ---
-            // This is the ONLY check that triggers a rollover.
-            // It compares the app's current saved month with the device's actual current month.
-            // --- END: MODIFIED LOGIC ---
+            // Use simple string comparison. Works on all browsers.
             if (state.monthYear && currentMonthYear > state.monthYear) {
                 
                 const previousMonthName = formatYearMonth(state.monthYear); // Format for display
@@ -835,11 +863,13 @@
                 const stateForHistory = { ...state, activeChallenges: evaluatedChallenges };
                 delete stateForHistory.history;
                 const newHistoryKey = push(ref(db, `budgets/${currentBudgetId}/history`)).key;
-                const newHistory = { ...(state.history || {}), [newHistoryKey]: stateForHistory };
+                // Save the "YYYY-MM" format into history
+                const newHistory = { ...(state.history || {}), [newHistoryKey]: { ...stateForHistory, monthYear: state.monthYear } };
                 const newEarnedTrophies = {};
                 newlyCompletedKeysForTrophy.forEach(key => {
                     const challenge = evaluatedChallenges[key];
                     const newTrophyKey = push(ref(db, `budgets/${currentBudgetId}/earnedTrophies`)).key;
+                    // Save the "YYYY-MM" format to the trophy
                     newEarnedTrophies[newTrophyKey] = { ...challenge, archivedMonth: state.monthYear };
                 });
 
@@ -892,6 +922,7 @@
             }
             return false;
         }
+        // --- END: MODIFIED FUNCTION ---
 
         function showRolloverSummary(previousMonthName, summaryData) {
             if (summaryData.length === 0) {
@@ -1217,7 +1248,7 @@
                         }
                     } else { 
                         progressPercent = 0; 
-                        if (totalContributions > 0) {
+                        if (totalContributions > 0 || amountLeft < 0) {
                              overspentPercent = 100; 
                         } else {
                              overspentPercent = 0;
@@ -1281,16 +1312,21 @@
                 parentList.appendChild(itemDiv); 
             }); 
         }
+        
+        // --- START: MODIFIED FUNCTION ---
         function renderHeader() { 
             const accountName = state.accountName || `Shared Budget`; 
             document.title = `Budgety Buddy - ${accountName}`; 
             selectors.currentAccountName.textContent = accountName; 
+            // Use the formatter function for display
             selectors.currentMonth.textContent = formatYearMonth(state.monthYear); 
         }
+        // --- END: MODIFIED FUNCTION ---
 
         function createCashflowChart(monthData) { if(cashflowChartInstance) cashflowChartInstance.destroy(); const totalIncome = calculateTotalIncome(monthData); const totalSpending = calculateTotalMonthlyExpenses(monthData) + calculateTotalBudgetedSpending(monthData) + calculateTotalContributions(monthData); const ctx = document.getElementById('cashflow-chart').getContext('2d'); cashflowChartInstance = new Chart(ctx, { type: 'bar', data: { labels: ['Total Income', 'Total Outgoing'], datasets: [{ label: 'Amount', data: [totalIncome, totalSpending], backgroundColor: ['rgba(46, 204, 113, 0.7)', 'rgba(231, 76, 60, 0.7)'], borderColor: ['#2ecc71', '#e74c3c'], borderWidth: 1 }] }, options: { scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } } }); }
         function createSpendingChart(monthData) { if(spendingChartInstance) spendingChartInstance.destroy(); const categorySpending = getItemsByType(monthData, 'budget').map(cat => ({ name: cat.name, total: toArray(cat.expenses).reduce((sum, exp) => sum + exp.amount, 0) })).filter(c => c.total > 0); const ctx = document.getElementById('spending-chart').getContext('2d'); spendingChartInstance = new Chart(ctx, { type: 'pie', data: { labels: categorySpending.map(c => c.name), datasets: [{ data: categorySpending.map(c => c.total), borderWidth: 1 }] }, options: { plugins: { legend: { position: 'bottom' } } } }); }
         
+        // --- START: MODIFIED FUNCTION ---
         function createComparisonCashflowChart(month1, month2) { 
             if(comparisonCashflowChart) comparisonCashflowChart.destroy(); 
             const totalIncome1 = calculateTotalIncome(month1); 
@@ -1316,6 +1352,7 @@
                 { label: formatYearMonth(month2.monthYear), data: data2, backgroundColor: 'rgba(126, 211, 33, 0.7)', } 
             ] }, options: { indexAxis: 'y' } }); 
         }
+        // --- END: MODIFIED FUNCTION ---
         
         function renderChallenges() {
             renderAvailableChallenges();
@@ -1380,6 +1417,7 @@
             });
         }
 
+        // --- START: MODIFIED FUNCTION ---
         function renderEarnedTrophies() {
             selectors.earnedTrophiesList.innerHTML = '';
             const trophies = state.earnedTrophies || {};
@@ -1390,10 +1428,12 @@
             let html = '';
             Object.values(trophies).sort((a,b) => new Date(b.startDate) - new Date(a.startDate)).forEach(trophy => {
                 const definition = CHALLENGE_DEFINITIONS[trophy.challengeId];
+                 // Use the formatter function for display
                  html += `<div class="challenge-item completed"><h4>${definition.badge} ${definition.title} ${trophy.targetCategoryName ? `(${trophy.targetCategoryName})` : ''}</h4><p>Completed: ${formatYearMonth(trophy.archivedMonth)}</p></div>`;
             });
             selectors.earnedTrophiesList.innerHTML = html;
         }
+        // --- END: MODIFIED FUNCTION ---
 
         function renderReviewRewards(monthData) {
             const rewardsSection = selectors.reviewRewardsSection;
@@ -1402,6 +1442,7 @@
             rewardsSection.style.display = 'block';
 
             const allTrophiesInHistory = monthData.earnedTrophies || {};
+            // Compare "YYYY-MM" to "YYYY-MM"
             const trophiesForThisMonth = Object.values(allTrophiesInHistory).filter(trophy => trophy.archivedMonth === monthData.monthYear);
 
             if (trophiesForThisMonth.length === 0) {
@@ -1501,7 +1542,6 @@
                 newChallenge.currentStreak = 0;
                 const yesterday = new Date();
                 yesterday.setDate(yesterday.getDate() - 1);
-                // Temporarily create a date string for yesterday
                 const year = yesterday.getFullYear();
                 const month = (yesterday.getMonth() + 1).toString().padStart(2, '0');
                 const day = yesterday.getDate().toString().padStart(2, '0');
@@ -1662,7 +1702,7 @@
                 showChallengeAlert(`Congratulations! You completed the "Expense Logger" challenge!`);
             } else {
                 const updates = {};
-                updates[`/activeChallenges/${challengeKey}/currentStreak`] = newStreak;
+                updates[`/activeChallenges/${key}/currentStreak`] = newStreak;
                 updates[`/activeChallenges/${key}/lastLogDate`] = todayStr;
                 await update(dbRef, updates);
             }
@@ -1895,6 +1935,7 @@
             closeModal(selectors.rolloverModal);
         });
 
+        // --- START: MODIFIED FUNCTION ---
         selectors.reviewBtn.addEventListener('click', () => { 
             selectors.reviewRewardsSection.style.display = 'none';
             selectors.reviewExpenseLogSection.style.display = 'none';
@@ -1910,6 +1951,7 @@
                 history.forEach((month, index) => { 
                     const option = document.createElement('option'); 
                     option.value = index; 
+                    // Use the formatter function for display
                     option.textContent = formatYearMonth(month.monthYear); 
                     selectors.monthSelect.appendChild(option); 
                 }); 
@@ -1917,6 +1959,7 @@
             } 
             selectors.reviewModal.style.display = 'flex'; 
         });
+        // --- END: MODIFIED FUNCTION ---
 
         selectors.monthSelect.addEventListener('change', (e) => { 
             const selectedMonthData = history[e.target.value]; 
