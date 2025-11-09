@@ -1,3 +1,4 @@
+:Budgety Buddy:index.html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -297,6 +298,75 @@
             font-size: 1.1em;
         }
         /* --- END: NEW FEATURE STYLES --- */
+        
+        /* --- START: CUSTOM SELECT STYLES --- */
+        .custom-select-container {
+            width: 100%;
+            margin-top: 10px;
+            position: relative;
+            outline: none; /* Remove default focus outline */
+        }
+
+        .custom-select-display {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            background-color: #fff;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        /* Highlight when focused or active */
+        .custom-select-container:focus .custom-select-display,
+        .custom-select-container.active .custom-select-display {
+             border-color: var(--accent-color);
+             box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+        }
+
+        .custom-options-list {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            max-height: 250px;
+            overflow-y: auto;
+            background-color: #fff;
+            border: 1px solid var(--accent-color);
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+            z-index: 1050;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .custom-select-container.active .custom-options-list {
+            display: block;
+        }
+        
+        /* Make the initial display have squared bottom corners when open */
+        .custom-select-container.active .custom-select-display {
+            border-bottom-left-radius: 0;
+            border-bottom-right-radius: 0;
+        }
+
+        .custom-option {
+            padding: 12px 10px; /* Larger touch target */
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            transition: background-color 0.2s;
+        }
+
+        .custom-option:last-child {
+            border-bottom: none;
+        }
+
+        .custom-option:hover, .custom-option.selected {
+            background-color: #f0f8ff;
+        }
+        /* --- END: CUSTOM SELECT STYLES --- */
 
         @media (max-width: 600px) { 
             .chart-container { grid-template-columns: 1fr; } 
@@ -995,7 +1065,7 @@
             }); 
         }
         
-        // --- START: MODIFIED FUNCTION ---
+        // --- START: MODIFIED FUNCTION (HANDLES CUSTOM SELECT) ---
         function showPrompt({ title, inputs }) {
             return new Promise(resolve => {
                 selectors.promptTitle.textContent = title;
@@ -1005,7 +1075,18 @@
                     let inputHtml = `<label style="display: block; margin-top: 10px; font-weight: 500;">${input.label}</label>`;
                     if (input.type === 'select') {
                         inputHtml += `<select id="${input.id}">` + input.options.map(opt => `<option value="${opt.value}">${opt.text}</option>`).join('') + `</select>`;
-                    } else {
+                    } 
+                    else if (input.type === 'custom-select') {
+                        // New Custom Select HTML Structure
+                         inputHtml += `
+                            <div class="custom-select-container" id="${input.id}" tabindex="0">
+                                <div class="custom-select-display">Select Category...</div>
+                                <div class="custom-options-list">
+                                    ${input.options.map(opt => `<div class="custom-option" data-value="${opt.value}">${opt.text}</div>`).join('')}
+                                </div>
+                            </div>`;
+                    }
+                    else {
                         inputHtml += `<input type="${input.type}" id="${input.id}" placeholder="${input.placeholder || ''}" min="1">`;
                     }
                     selectors.promptContent.innerHTML += inputHtml;
@@ -1023,48 +1104,92 @@
                     }
                 }
 
-                // --- START: NEW KEYBOARD NAVIGATION ---
                 const listeners = [];
 
                 const focusNextInput = (currentId) => {
                     const currentIndex = inputs.findIndex(input => input.id === currentId);
                     if (currentIndex !== -1 && currentIndex + 1 < inputs.length) {
                         const nextInputId = inputs[currentIndex + 1].id;
-                        document.getElementById(nextInputId)?.focus();
+                        const nextEl = document.getElementById(nextInputId);
+                        if (nextEl) {
+                            nextEl.focus();
+                            // Auto-open if it's our custom select
+                            if (nextEl.classList.contains('custom-select-container')) {
+                                nextEl.classList.add('active');
+                            }
+                        }
                     } else {
                         // If it's the last input, click OK
                         selectors.promptOkBtn.click();
                     }
                 };
-
+                
+                // --- MODIFIED EVENT LISTENERS & CUSTOM SELECT LOGIC ---
                 inputs.forEach(input => {
                     const el = document.getElementById(input.id);
                     if (el) {
-                        const listener = (e) => {
-                            if (e.key === 'Enter') {
-                                e.preventDefault(); 
-                                focusNextInput(input.id);
-                            }
-                        };
-                        listeners.push({ el, listener });
-                        el.addEventListener('keydown', listener);
+                         if (input.type === 'custom-select') {
+                            // Handle opening/closing on click
+                            const displayEl = el.querySelector('.custom-select-display');
+                            const toggleListener = () => el.classList.toggle('active');
+                            displayEl.addEventListener('click', toggleListener);
+                            listeners.push({ el: displayEl, event: 'click', listener: toggleListener });
+
+                            // Handle option selection
+                            el.querySelectorAll('.custom-option').forEach(optionEl => {
+                                const selectListener = (e) => {
+                                    e.stopPropagation(); // Prevent bubbling to container
+                                    // Update display text and store value on the container
+                                    el.querySelector('.custom-select-display').textContent = optionEl.textContent;
+                                    el.dataset.value = optionEl.dataset.value;
+                                    // Visual selection state
+                                    el.querySelectorAll('.custom-option').forEach(opt => opt.classList.remove('selected'));
+                                    optionEl.classList.add('selected');
+                                    // Close and move next
+                                    el.classList.remove('active');
+                                    focusNextInput(input.id);
+                                };
+                                optionEl.addEventListener('click', selectListener);
+                                listeners.push({ el: optionEl, event: 'click', listener: selectListener });
+                            });
+
+                        } else if (el.tagName.toLowerCase() === 'select') {
+                            const listener = (e) => { focusNextInput(input.id); };
+                            listeners.push({ el, event: 'change', listener });
+                            el.addEventListener('change', listener);
+                        } else {
+                            const listener = (e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault(); 
+                                    focusNextInput(input.id);
+                                }
+                            };
+                            listeners.push({ el, event: 'keydown', listener });
+                            el.addEventListener('keydown', listener);
+                        }
                     }
                 });
-                // --- END: NEW KEYBOARD NAVIGATION ---
 
                 const onOk = () => {
                     const results = {};
                     let isValid = true;
                     inputs.forEach(input => {
                         const el = document.getElementById(input.id);
-                        if (el.type === 'number' && (el.value === '' || parseFloat(el.value) <= 0)) {
-                            isValid = false;
+                        let value;
+                        if (input.type === 'custom-select') {
+                             value = el.dataset.value;
+                             if (!value) isValid = false; // Ensure a category is selected
+                        } else {
+                             value = el.value;
+                             if (el.type === 'number' && (value === '' || parseFloat(value) <= 0)) {
+                                isValid = false;
+                            }
                         }
-                        results[input.id] = el.value;
+                        results[input.id] = value;
                     });
 
                     if (!isValid) {
-                        alert('Please enter a valid number greater than 0.');
+                        alert('Please enter all required fields.');
                         return;
                     }
 
@@ -1081,9 +1206,8 @@
                     selectors.promptModal.style.display = 'none';
                     selectors.promptOkBtn.removeEventListener('click', onOk);
                     selectors.promptCancelBtn.removeEventListener('click', onCancel);
-                    // Clean up keydown listeners
-                    listeners.forEach(({ el, listener }) => {
-                        el.removeEventListener('keydown', listener);
+                    listeners.forEach(({ el, event, listener }) => {
+                        el.removeEventListener(event, listener);
                     });
                 };
                 
@@ -1792,7 +1916,7 @@
                 inputs: [
                     { type: 'number', id: 'quick-amount', label: 'Amount:' },
                     { 
-                        type: 'select', 
+                        type: 'custom-select', // Changed from 'select' to 'custom-select'
                         id: 'quick-category', 
                         label: 'Category:', 
                         options: spendingCategories.map(([key, cat]) => ({ value: key, text: cat.name }))
