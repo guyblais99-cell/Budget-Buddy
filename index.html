@@ -995,6 +995,7 @@
             }); 
         }
         
+        // --- START: MODIFIED FUNCTION ---
         function showPrompt({ title, inputs }) {
             return new Promise(resolve => {
                 selectors.promptTitle.textContent = title;
@@ -1012,18 +1013,44 @@
 
                 selectors.promptModal.style.display = 'flex';
                 
-                // --- START: MODIFICATION ---
-                // Automatically focus the first input element in the prompt
+                // Auto-focus the first input
                 if (inputs.length > 0) {
                     const firstInputEl = document.getElementById(inputs[0].id);
                     if (firstInputEl) {
-                        // Use requestAnimationFrame to ensure focus works after modal display
                         requestAnimationFrame(() => {
                              firstInputEl.focus();
                         });
                     }
                 }
-                // --- END: MODIFICATION ---
+
+                // --- START: NEW KEYBOARD NAVIGATION ---
+                const listeners = [];
+
+                const focusNextInput = (currentId) => {
+                    const currentIndex = inputs.findIndex(input => input.id === currentId);
+                    if (currentIndex !== -1 && currentIndex + 1 < inputs.length) {
+                        const nextInputId = inputs[currentIndex + 1].id;
+                        document.getElementById(nextInputId)?.focus();
+                    } else {
+                        // If it's the last input, click OK
+                        selectors.promptOkBtn.click();
+                    }
+                };
+
+                inputs.forEach(input => {
+                    const el = document.getElementById(input.id);
+                    if (el) {
+                        const listener = (e) => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault(); 
+                                focusNextInput(input.id);
+                            }
+                        };
+                        listeners.push({ el, listener });
+                        el.addEventListener('keydown', listener);
+                    }
+                });
+                // --- END: NEW KEYBOARD NAVIGATION ---
 
                 const onOk = () => {
                     const results = {};
@@ -1050,16 +1077,21 @@
                     resolve(null);
                 };
 
-                const cleanup = () => {
+                let cleanup = () => {
                     selectors.promptModal.style.display = 'none';
                     selectors.promptOkBtn.removeEventListener('click', onOk);
                     selectors.promptCancelBtn.removeEventListener('click', onCancel);
+                    // Clean up keydown listeners
+                    listeners.forEach(({ el, listener }) => {
+                        el.removeEventListener('keydown', listener);
+                    });
                 };
                 
                 selectors.promptOkBtn.addEventListener('click', onOk);
                 selectors.promptCancelBtn.addEventListener('click', onCancel);
             });
         }
+        // --- END: MODIFIED FUNCTION ---
         
         const toArray = (obj) => obj ? Object.values(obj) : [];
         const calculateTotalIncome = (data) => toArray(data.income).reduce((sum, item) => sum + item.amount, 0);
