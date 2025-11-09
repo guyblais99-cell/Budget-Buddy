@@ -1011,6 +1011,19 @@
                 });
 
                 selectors.promptModal.style.display = 'flex';
+                
+                // --- START: MODIFICATION ---
+                // Automatically focus the first input element in the prompt
+                if (inputs.length > 0) {
+                    const firstInputEl = document.getElementById(inputs[0].id);
+                    if (firstInputEl) {
+                        // Use requestAnimationFrame to ensure focus works after modal display
+                        requestAnimationFrame(() => {
+                             firstInputEl.focus();
+                        });
+                    }
+                }
+                // --- END: MODIFICATION ---
 
                 const onOk = () => {
                     const results = {};
@@ -2125,4 +2138,3 @@
     </script>
 </body>
 </html>
-
