@@ -305,11 +305,13 @@
             margin-top: 10px;
             position: relative;
             outline: none; /* Remove default focus outline */
+            /* Ensure it's tappable on mobile */
+            -webkit-tap-highlight-color: transparent;
         }
 
         .custom-select-display {
             width: 100%;
-            padding: 10px;
+            padding: 12px; /* Larger touch target */
             border: 1px solid var(--border-color);
             border-radius: 5px;
             background-color: #fff;
@@ -317,6 +319,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            font-size: 16px; /* Prevent auto-zoom on iOS */
         }
         
         /* Highlight when focused or active */
@@ -334,6 +337,7 @@
             width: 100%;
             max-height: 250px;
             overflow-y: auto;
+            -webkit-overflow-scrolling: touch; /* Smooth scroll on iOS */
             background-color: #fff;
             border: 1px solid var(--accent-color);
             border-top: none;
@@ -1087,21 +1091,21 @@
                             </div>`;
                     }
                     else {
-                        inputHtml += `<input type="${input.type}" id="${input.id}" placeholder="${input.placeholder || ''}" min="1">`;
+                        // Added inputmode="decimal" for better mobile keyboard
+                        const inputMode = input.type === 'number' ? ' inputmode="decimal"' : '';
+                        inputHtml += `<input type="${input.type}" id="${input.id}" placeholder="${input.placeholder || ''}" min="1"${inputMode}>`;
                     }
                     selectors.promptContent.innerHTML += inputHtml;
                 });
 
                 selectors.promptModal.style.display = 'flex';
                 
-                // Auto-focus the first input
+                // Auto-focus the first input with a slight delay for mobile
                 if (inputs.length > 0) {
-                    const firstInputEl = document.getElementById(inputs[0].id);
-                    if (firstInputEl) {
-                        requestAnimationFrame(() => {
-                             firstInputEl.focus();
-                        });
-                    }
+                    setTimeout(() => {
+                         const firstInputEl = document.getElementById(inputs[0].id);
+                         if (firstInputEl) firstInputEl.focus();
+                    }, 50);
                 }
 
                 const listeners = [];
@@ -1112,11 +1116,14 @@
                         const nextInputId = inputs[currentIndex + 1].id;
                         const nextEl = document.getElementById(nextInputId);
                         if (nextEl) {
-                            nextEl.focus();
-                            // Auto-open if it's our custom select
-                            if (nextEl.classList.contains('custom-select-container')) {
-                                nextEl.classList.add('active');
-                            }
+                            // Tiny timeout to let mobile keyboard events settle
+                            setTimeout(() => {
+                                nextEl.focus();
+                                // Explicitly force open if it's our custom select
+                                if (nextEl.classList.contains('custom-select-container')) {
+                                    nextEl.classList.add('active');
+                                }
+                            }, 50);
                         }
                     } else {
                         // If it's the last input, click OK
@@ -2200,9 +2207,9 @@
                     } 
                 } 
             } 
-            else if (button.classList.contains('edit-item-btn')) { set(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}/isEditing`), true); }
-            else if (button.classList.contains('cancel-item-btn')) { set(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}/isEditing`), false); }
-            else if (button.classList.contains('save-item-btn')) { const form = button.closest('.input-group'); const newName = form.querySelector('.edit-item-name-input').value.trim(); const newAmount = parseFloat(form.querySelector('.edit-item-amount-input').value); if (newName && newAmount > 0) { update(ref(db, `budgets/${currentBudgetId}/${dbPath}/${key}`), { name: newName, amount: newAmount, isEditing: false }); } else { alert('Please enter a valid name and amount.'); } } 
+            else if (button.classList.contains('edit-item-btn')) { set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}/isEditing`), true); }
+            else if (button.classList.contains('cancel-item-btn')) { set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}/isEditing`), false); }
+            else if (button.classList.contains('save-item-btn')) { const form = button.closest('.input-group'); const newName = form.querySelector('.edit-item-name-input').value.trim(); const newAmount = parseFloat(form.querySelector('.edit-item-amount-input').value); if (newName && newAmount > 0) { update(ref(db, `budgets/${currentBudgetId}/budgetedItems/${dbPath}/${key}`), { name: newName, amount: newAmount, isEditing: false }); } else { alert('Please enter a valid name and amount.'); } } 
             else if (button.classList.contains('edit-btn')) { 
                 if (button.classList.contains('edit-expense-btn')) { 
                     set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses/${expenseKey}/isEditing`), true); 
