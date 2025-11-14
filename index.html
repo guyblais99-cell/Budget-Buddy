@@ -1,4 +1,3 @@
-:Budgety Buddy:index.html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -76,9 +75,11 @@
             font-size: 1.6em;
             color: #555;
         }
-        .summary-display { background: linear-gradient(135deg, var(--accent-color), var(--accent-hover)); color: white; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
-        .summary-display h2 { margin: 0; font-size: 1.2em; font-weight: 500; color: white; }
-        .summary-display p { font-size: 2.5em; font-weight: bold; margin: 5px 0 0; }
+    .summary-display { background: linear-gradient(135deg, var(--accent-color), var(--accent-hover)); color: white; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
+    .summary-display h2 { margin: 0; font-size: 1.2em; font-weight: 500; color: white; }
+    /* specifically target the big remaining amount so we can add a smaller red spent line below */
+    .summary-display #remaining-to-spend { font-size: 2.5em; font-weight: bold; margin: 5px 0 0; }
+    .summary-display .amount-spent { font-size: 0.95em; color: var(--expense-color); margin: 6px 0 0; font-weight: 600; opacity: 0.98; }
         .section { margin-bottom: 25px; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; transition: background-color: 0.3s, border-color: 0.3s; }
         .section-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); margin-bottom: 10px; }
         .section-header h3 { margin: 0; }
@@ -344,6 +345,23 @@
             color: var(--expense-color);
             margin-bottom: 15px;
         }
+        /* Make the primary quick-add expense button more prominent (gold theme) */
+        #quick-add-expense-btn {
+            width: 100%;
+            padding: 14px 18px;
+            font-size: 1.05em;
+            font-weight: 700;
+            color: var(--challenge-text);
+            background: linear-gradient(135deg, var(--challenge-dark-gold), var(--challenge-gold));
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 8px 20px rgba(212,175,55,0.18);
+            cursor: pointer;
+            transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+            margin-bottom: 20px;
+        }
+        #quick-add-expense-btn:hover { transform: translateY(-3px); box-shadow: 0 14px 28px rgba(212,175,55,0.22); }
+        #quick-add-expense-btn:active { transform: translateY(-1px); }
         /* --- END: QUICK ADD STYLES --- */
 
         @media (max-width: 600px) { 
@@ -385,9 +403,13 @@
             </div>
         </div>
 
-        <button id="quick-add-expense-btn" style="width: 100%; margin-bottom: 20px;">＋ Quick Add Expense</button>
+        <button id="quick-add-expense-btn">＋ Quick Add Expense</button>
 
-        <div class="summary-display budget-section-summary"><h2>Remaining to Spend</h2><p id="remaining-to-spend">$0.00</p></div>
+        <div class="summary-display budget-section-summary">
+            <h2>Remaining to Spend</h2>
+            <p id="remaining-to-spend">$0.00</p>
+            <p class="amount-spent">Amount spent: <span id="amount-spent-value">$0.00</span></p>
+        </div>
         
         <div class="section" id="budget-spending-section">
             <div class="section-header">
@@ -670,6 +692,7 @@
             closeQuickAddBtn: document.getElementById('close-quick-add-btn'),
             quickAddTitle: document.getElementById('quick-add-title'),
             quickAddStepContent: document.getElementById('quick-add-step-content'),
+            amountSpentValue: document.getElementById('amount-spent-value'),
         };
 
         const currencyFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
@@ -1054,6 +1077,8 @@
             const totalSpendable = calculateTotalSpendableInBudgets(state);
             const totalSpending = calculateTotalBudgetedSpending(state);
             selectors.remainingToSpend.textContent = currencyFormatter.format(totalSpendable - totalSpending);
+            // show the total amount spent from budgeted categories (logged expenses)
+            if (selectors.amountSpentValue) selectors.amountSpentValue.textContent = currencyFormatter.format(totalSpending);
             selectors.summaryTotalIncome.textContent = currencyFormatter.format(calculateTotalIncome(state));
             selectors.summaryTotalExpenses.textContent = currencyFormatter.format(calculateTotalMonthlyExpenses(state));
             const totalAllocatedToBudgets = calculateTotalAllocatedToBudgets(state);
