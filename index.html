@@ -614,7 +614,9 @@
         let currentBudgetId = null;
         let dbRef = null;
         let history = [];
-        let cashflowChartInstance, spendingChartInstance, comparisonCashflowChart, comparisonSpendingChart;
+    let cashflowChartInstance, spendingChartInstance, comparisonCashflowChart, comparisonSpendingChart;
+    // map category name -> color used in the spending pie chart (keeps chart and review list visually linked)
+    let spendingColorMap = {};
         let isFirstLoad = true; 
 
         // --- QUICK ADD STATE ---
@@ -1237,7 +1239,35 @@
         // --- END: MODIFIED FUNCTION ---
 
         function createCashflowChart(monthData) { if(cashflowChartInstance) cashflowChartInstance.destroy(); const totalIncome = calculateTotalIncome(monthData); const totalSpending = calculateTotalMonthlyExpenses(monthData) + calculateTotalBudgetedSpending(monthData) + calculateTotalContributions(monthData); const ctx = document.getElementById('cashflow-chart').getContext('2d'); cashflowChartInstance = new Chart(ctx, { type: 'bar', data: { labels: ['Total Income', 'Total Outgoing'], datasets: [{ label: 'Amount', data: [totalIncome, totalSpending], backgroundColor: ['rgba(46, 204, 113, 0.7)', 'rgba(231, 76, 60, 0.7)'], borderColor: ['#2ecc71', '#e74c3c'], borderWidth: 1 }] }, options: { scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } } }); }
-        function createSpendingChart(monthData) { if(spendingChartInstance) spendingChartInstance.destroy(); const categorySpending = getItemsByType(monthData, 'budget').map(cat => ({ name: cat.name, total: toArray(cat.expenses).reduce((sum, exp) => sum + exp.amount, 0) })).filter(c => c.total > 0); const ctx = document.getElementById('spending-chart').getContext('2d'); spendingChartInstance = new Chart(ctx, { type: 'pie', data: { labels: categorySpending.map(c => c.name), datasets: [{ data: categorySpending.map(c => c.total), borderWidth: 1 }] }, options: { plugins: { legend: { position: 'bottom' } } } }); }
+        function createSpendingChart(monthData) {
+            if (spendingChartInstance) spendingChartInstance.destroy();
+            // build data for categories
+            const categorySpending = getItemsByType(monthData, 'budget').map(cat => ({ name: cat.name, total: toArray(cat.expenses).reduce((sum, exp) => sum + exp.amount, 0) })).filter(c => c.total > 0);
+            const ctx = document.getElementById('spending-chart').getContext('2d');
+
+            // generate a consistent color per category using HSL so we can reuse it in the review list
+            const bgColors = [];
+            const borderColors = [];
+            spendingColorMap = {}; // reset
+            categorySpending.forEach((c, i) => {
+                const hue = (i * 47) % 360; // step hue to get visually distinct colors
+                const solid = `hsl(${hue} 72% 45%)`;
+                const border = `hsl(${hue} 72% 35%)`;
+                const translucent = `hsla(${hue} 72% 60%, 0.12)`; // good for background blocks
+                bgColors.push(solid);
+                borderColors.push(border);
+                spendingColorMap[c.name] = { solid, border, translucent };
+            });
+
+            spendingChartInstance = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: categorySpending.map(c => c.name),
+                    datasets: [{ data: categorySpending.map(c => c.total), backgroundColor: bgColors, borderColor: borderColors, borderWidth: 1 }]
+                },
+                options: { plugins: { legend: { position: 'bottom' } } }
+            });
+        }
         
         // --- START: MODIFIED FUNCTION ---
         function createComparisonCashflowChart(month1, month2) { 
@@ -1342,21 +1372,44 @@
         function renderReviewExpenseLog(monthData) {
             const { reviewExpenseLogList, reviewExpenseLogSection } = selectors;
             reviewExpenseLogList.innerHTML = '';
-            let allExpenses = [];
-            if (monthData.budgetedItems) {
-                for (const category of Object.values(monthData.budgetedItems)) {
-                    if (category.expenses) {
-                        const categoryExpenses = Object.values(category.expenses).map(exp => ({ ...exp, categoryName: category.name }));
-                        allExpenses.push(...categoryExpenses);
-                    }
-                }
-            }
-            if (allExpenses.length === 0) { reviewExpenseLogSection.style.display = 'none'; return; }
-            allExpenses.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            const budgetItems = monthData.budgetedItems || {};
+            const categories = Object.entries(budgetItems).map(([key, cat]) => ({ key, ...cat }));
+            // Only keep categories that have expenses
+            const categoriesWithExpenses = categories.filter(cat => cat.expenses && Object.keys(cat.expenses).length > 0);
+            if (categoriesWithExpenses.length === 0) { reviewExpenseLogSection.style.display = 'none'; return; }
+
+            // Build HTML grouped by category
             let html = '';
-            allExpenses.forEach(exp => {
-                html += `<div style="display: flex; justify-content: space-between; padding: 4px 2px; border-bottom: 1px solid #f0f0f0;"><span style="max-width: 75%; word-break: break-word;"><strong>${currencyFormatter.format(exp.amount)}</strong> - <span style="color: #666; font-style: italic;">${exp.note || 'No note'}</span> <em>(${exp.categoryName})</em></span><span style="color: #888; white-space: nowrap; margin-left: 10px;">${exp.date}</span></div>`;
+            categoriesWithExpenses.forEach((cat) => {
+                const catName = cat.name;
+                const expenses = Object.values(cat.expenses || {}).sort((a,b) => new Date(a.date) - new Date(b.date));
+                const totalSpent = expenses.reduce((s, e) => s + e.amount, 0);
+                const budgetLimit = (cat.limit || 0);
+                const remaining = +(budgetLimit - totalSpent).toFixed(2);
+                const overspent = remaining < 0 ? Math.abs(remaining) : 0;
+
+                // pick color from spendingColorMap if available, otherwise fall back to a neutral highlight
+                const colorInfo = spendingColorMap[catName] || { translucent: 'rgba(0,0,0,0.04)', solid: 'rgba(0,0,0,0.06)', border: 'rgba(0,0,0,0.10)' };
+
+                html += `<div class="review-category-block" style="background:${colorInfo.translucent}; border:2px solid ${colorInfo.border}; border-radius:8px; padding:10px; margin-bottom:8px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px;">
+                                <div style="font-weight:700;">${catName}</div>
+                                <div style="text-align:right; font-size:0.95em; color:#333;">${cat.limit ? `${currencyFormatter.format(totalSpent)} of ${currencyFormatter.format(budgetLimit)} budgeted` : `${currencyFormatter.format(totalSpent)} spent`}</div>
+                            </div>
+                            <div style="font-size:0.9em; color:#555; margin-bottom:8px;">${overspent > 0 ? `<span style=\"color:var(--expense-color); font-weight:600;\">Overspent by ${currencyFormatter.format(overspent)}</span>` : `<span style=\"color:var(--income-color); font-weight:600;\">Remaining ${currencyFormatter.format(remaining)}</span>`}</div>
+                            <div style="background:transparent; border-radius:6px; padding:6px;">
+                                <div style="display:flex; flex-direction:column; gap:6px;">
+`;
+                expenses.forEach(exp => {
+                    html += `<div style="display:flex; justify-content:space-between; padding:6px; background:rgba(255,255,255,0.35); border-radius:6px;"><div style="max-width:75%; word-break:break-word;"><strong>${currencyFormatter.format(exp.amount)}</strong> - <span style="color:#666; font-style:italic;">${exp.note || 'No note'}</span></div><div style="color:#888; white-space:nowrap; margin-left:10px;">${exp.date || ''}</div></div>`;
+                });
+
+                html += `        </div>
+                            </div>
+                        </div>`;
             });
+
             reviewExpenseLogList.innerHTML = html;
             reviewExpenseLogSection.style.display = 'block';
         }
