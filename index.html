@@ -479,7 +479,7 @@
                 <div id="no-history-msg" style="display: none; text-align: center; margin-top: 20px;"><p>No historical data for this budget yet.</p><button id="no-history-close-btn" style="margin-top: 15px;">Go Back</button></div>
                 <div class="chart-container" id="charts-area"><div><h3>Cash Flow</h3><canvas id="cashflow-chart"></canvas></div><div><h3>Spending Breakdown</h3><canvas id="spending-chart"></canvas></div></div>
                 <div class="section" id="review-rewards-section" style="margin-top: 20px; display: none;"><h3>🏆 Monthly Achievements</h3><div id="review-rewards-list"></div></div>
-                <div class="section" id="review-expense-log-section" style="margin-top: 20px; display: none;"><h3>🧾 Detailed Expense Log</h3><div id="review-expense-log-list" style="max-height: 200px; overflow-y: auto; font-size: 0.9em;"></div></div>
+                <div class="section" id="review-expense-log-section" style="margin-top: 20px; display: none;"><h3>🧾 Detailed Expense Log</h3><div id="review-expense-log-list" style="max-height: 300px; overflow-y: auto; font-size: 0.9em;"></div></div>
             </div>
 
             <div id="compare-months-view" class="tab-content">
@@ -918,7 +918,8 @@
                 const rolloverSummaryData = [];
                 const newBudgets = state.budgetedItems ? Object.entries(state.budgetedItems).reduce((acc, [key, item]) => {
                     const totalSpent = (item.expenses ? Object.values(item.expenses) : []).reduce((sum, exp) => sum + exp.amount, 0);
-                    const unspent = item.limit - totalSpent;
+                    const currentRollover = item.rolloverBalance || 0;
+                    const unspent = (item.limit + currentRollover) - totalSpent;
                     if(item.type !== 'savings' && unspent > 0) {
                         rolloverSummaryData.push({ name: item.name, budgeted: item.limit, spent: totalSpent, unspent: unspent });
                     }
@@ -964,7 +965,7 @@
                 const savingsOptions = savingsGoals.length > 0 
                     ? savingsGoals.map(([key, goal]) => `<option value="${key}">${goal.name}</option>`).join('')
                     : '<option value="">No savings goals found</option>';
-                return `<div class="rollover-item" data-category-name="${item.name}"><h4>${item.name}</h4><div class="rollover-details"><div><span>Budgeted</span><strong>${currencyFormatter.format(item.budgeted)}</strong></div><div><span>Spent</span><strong>${currencyFormatter.format(item.spent)}</strong></div><div><span>Unspent</span><strong style="color: var(--income-color);">${currencyFormatter.format(item.unspent)}</strong></div></div><label>Transfer to Savings:</label><div class="input-group"><input type="number" class="rollover-amount-input" value="${item.unspent.toFixed(2)}" min="0" max="${item.unspent.toFixed(2)}" step="0.01"><select class="rollover-savings-select" ${savingsGoals.length === 0 ? 'disabled' : ''}>${savingsOptions}</select></div></div>`;
+                return `<div class="rollover-item" data-category-name="${item.name}"><h4>${item.name}</h4><div class="rollover-details"><div><span>Budgeted</span><strong>${currencyFormatter.format(item.budgeted)}</strong></div><div><span>Spent</span><strong>${currencyFormatter.format(item.spent)}</strong></div><div><span>Unspent</span><strong style="color: var(--income-color);">${currencyFormatter.format(item.unspent)}</strong></div></div><label>Transfer to Savings:</label><div class="input-group"><input type="number" class="rollover-amount-input" value="0.00" min="0" max="${item.unspent.toFixed(2)}" step="0.01"><select class="rollover-savings-select" ${savingsGoals.length === 0 ? 'disabled' : ''}>${savingsOptions}</select></div></div>`;
             }).join('');
             selectors.rolloverModal.style.display = 'flex';
         }
