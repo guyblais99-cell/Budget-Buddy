@@ -1345,6 +1345,10 @@
                     backgroundColor: `hsl(${(index * 53) % 360} 65% 55% / 0.75)`
                 };
             });
+            const maxValue = Math.max(0, ...datasets.flatMap(d => d.data));
+            const stepSize = 1000;
+            const axisMax = Math.max(stepSize, Math.ceil(maxValue / stepSize) * stepSize);
+
             comparisonCashflowChart = new Chart(ctx, {
                 type: 'bar',
                 data: { labels: ['Total Income', 'Total Outgoing'], datasets },
@@ -1352,12 +1356,14 @@
                     scales: {
                         y: {
                             beginAtZero: true,
-                            max: Math.max(...datasets.flatMap(d => d.data)) * 1.1,
+                            max: axisMax,
                             ticks: {
-                                stepSize: 1000,
-                                precision: 0,
+                                stepSize,
+                                autoSkip: false,
+                                padding: 4,
+                                font: { size: 10 },
                                 callback: function(value) {
-                                    return '$' + value.toLocaleString();
+                                    return '$' + Number(value).toLocaleString();
                                 }
                             }
                         }
