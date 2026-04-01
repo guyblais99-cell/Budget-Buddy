@@ -169,6 +169,24 @@
         .tab-btn.active { background-color: var(--secondary-bg); border: 1px solid var(--border-color); border-bottom: 1px solid var(--secondary-bg); margin-bottom: -1px; font-weight: bold; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
+        .monthly-balance-summary {
+            margin-top: 12px;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: #fafcff;
+            font-size: 0.95em;
+        }
+        .monthly-balance-summary strong {
+            font-size: 1.15em;
+        }
+        .monthly-balance-subtext {
+            margin-top: 4px;
+            font-size: 0.88em;
+            color: #666;
+        }
+        .monthly-balance-positive { color: var(--income-color); }
+        .monthly-balance-negative { color: var(--expense-color); }
         
         /* Tooltip styles */
         .tooltip-container {
@@ -476,6 +494,7 @@
             
             <div id="single-month-view" class="tab-content active">
                 <div id="review-controls" style="width: 100%;"><label for="month-select">Select Month:</label><select id="month-select" style="padding: 8px; width: 100%;"></select></div>
+                <div id="single-month-balance" class="monthly-balance-summary" style="display: none;"></div>
                 <div id="no-history-msg" style="display: none; text-align: center; margin-top: 20px;"><p>No historical data for this budget yet.</p><button id="no-history-close-btn" style="margin-top: 15px;">Go Back</button></div>
                 <div class="chart-container" id="charts-area"><div><h3>Cash Flow</h3><canvas id="cashflow-chart"></canvas></div><div><h3>Spending Breakdown</h3><canvas id="spending-chart"></canvas></div></div>
                 <div class="section" id="review-rewards-section" style="margin-top: 20px; display: none;"><h3>🏆 Monthly Achievements</h3><div id="review-rewards-list"></div></div>
@@ -646,7 +665,7 @@
             expandAllBtn: document.getElementById('expand-all-btn'), collapseAllBtn: document.getElementById('collapse-all-btn'),
             reorderToggleBtn: document.getElementById('reorder-toggle-btn'),
             reviewBtn: document.getElementById('review-btn'), reviewModal: document.getElementById('review-modal'), closeReviewModalBtn: document.getElementById('close-review-modal-btn'),
-            monthSelect: document.getElementById('month-select'), chartsArea: document.getElementById('charts-area'), noHistoryMsg: document.getElementById('no-history-msg'),
+            monthSelect: document.getElementById('month-select'), chartsArea: document.getElementById('charts-area'), singleMonthBalance: document.getElementById('single-month-balance'), noHistoryMsg: document.getElementById('no-history-msg'),
             reviewControls: document.getElementById('review-controls'), noHistoryCloseBtn: document.getElementById('no-history-close-btn'),
             currentAccountName: document.getElementById('current-account-name'), manageAccountsBtn: document.getElementById('manage-accounts-btn'),
             accountsModal: document.getElementById('accounts-modal'), closeAccountsModalBtn: document.getElementById('close-accounts-modal-btn'),
@@ -1057,6 +1076,8 @@
         const calculateTotalAllocatedToSavings = (data) => getItemsByType(data, 'savings').reduce((sum, cat) => sum + cat.limit, 0);
         const calculateTotalBudgetedSpending = (data) => getItemsByType(data, 'budget').flatMap(cat => toArray(cat.expenses)).reduce((sum, exp) => sum + exp.amount, 0);
         const calculateTotalContributions = (data) => getItemsByType(data, 'savings').flatMap(cat => toArray(cat.expenses)).reduce((sum, exp) => sum + exp.amount, 0);
+        const calculateMonthlyNet = (data) => calculateTotalSpendableInBudgets(data) - calculateTotalBudgetedSpending(data);
+        const calculateMonthlyNetIncludingSavings = (data) => calculateMonthlyNet(data) + calculateTotalAllocatedToSavings(data);
         const calculateSpentInCategory = (categoryKey) => toArray(state.budgetedItems?.[categoryKey]?.expenses).reduce((sum, exp) => sum + exp.amount, 0);
         function getColorForPercentage(percent) { percent = Math.max(0, Math.min(100, percent)); const startColor = { r: 46, g: 204, b: 113 }; const midColor = { r: 255, g: 193, b: 7 }; const r = Math.round(startColor.r + (midColor.r - startColor.r) * (1 - percent / 100)); const g = Math.round(startColor.g + (midColor.g - startColor.g) * (1 - percent / 100)); const b = Math.round(startColor.b + (midColor.b - startColor.b) * (1 - percent / 100)); return `rgb(${r}, ${g}, ${b})`; }
 
@@ -1269,32 +1290,79 @@
                 options: { plugins: { legend: { position: 'bottom' } } }
             });
         }
+
+        function renderSingleMonthBalance(monthData) {
+            const balanceEl = selectors.singleMonthBalance;
+            if (!monthData) {
+                balanceEl.style.display = 'none';
+                return;
+            }
+            const monthlyNet = calculateMonthlyNet(monthData);
+            const monthlyNetIncludingSavings = calculateMonthlyNetIncludingSavings(monthData);
+            const isLeftover = monthlyNet >= 0;
+            const isLeftoverIncludingSavings = monthlyNetIncludingSavings >= 0;
+            balanceEl.style.display = 'block';
+            balanceEl.innerHTML = `Month Result: <strong class="${isLeftover ? 'monthly-balance-positive' : 'monthly-balance-negative'}">${currencyFormatter.format(Math.abs(monthlyNet))} ${isLeftover ? 'left over' : 'over budget'}</strong>
+                <div class="monthly-balance-subtext">Including allocated savings: <span class="${isLeftoverIncludingSavings ? 'monthly-balance-positive' : 'monthly-balance-negative'}">${currencyFormatter.format(Math.abs(monthlyNetIncludingSavings))} ${isLeftoverIncludingSavings ? 'left over' : 'over total'}</span></div>`;
+        }
+
+        function renderComparisonMonthlyBalance(months) {
+            return months.map((month) => {
+                const monthlyNet = calculateMonthlyNet(month);
+                const monthlyNetIncludingSavings = calculateMonthlyNetIncludingSavings(month);
+                const isLeftover = monthlyNet >= 0;
+                const isLeftoverIncludingSavings = monthlyNetIncludingSavings >= 0;
+                return `<div class="monthly-balance-summary" style="margin-top: 8px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+                                <span><strong>${formatYearMonth(month.monthYear)}</strong></span>
+                                <span style="display:flex; flex-direction:column; align-items:flex-end; text-align:right;">
+                                    <span class="${isLeftover ? 'monthly-balance-positive' : 'monthly-balance-negative'}" style="font-weight: 700;">
+                                        ${currencyFormatter.format(Math.abs(monthlyNet))} ${isLeftover ? 'left over' : 'over budget'}
+                                    </span>
+                                    <span class="monthly-balance-subtext">Including allocated savings: <span class="${isLeftoverIncludingSavings ? 'monthly-balance-positive' : 'monthly-balance-negative'}">${currencyFormatter.format(Math.abs(monthlyNetIncludingSavings))} ${isLeftoverIncludingSavings ? 'left over' : 'over total'}</span></span>
+                                </span>
+                            </div>
+                        </div>`;
+            }).join('');
+        }
         
         // --- START: MODIFIED FUNCTION ---
-        function createComparisonCashflowChart(month1, month2) { 
+        function createComparisonCashflowChart(months) { 
             if(comparisonCashflowChart) comparisonCashflowChart.destroy(); 
-            const totalIncome1 = calculateTotalIncome(month1); 
-            const totalOutgoing1 = calculateTotalMonthlyExpenses(month1) + calculateTotalBudgetedSpending(month1) + calculateTotalContributions(month1); 
-            const totalIncome2 = calculateTotalIncome(month2); 
-            const totalOutgoing2 = calculateTotalMonthlyExpenses(month2) + calculateTotalBudgetedSpending(month2) + calculateTotalContributions(month2); 
             const ctx = document.getElementById('comparison-cashflow-chart').getContext('2d'); 
-            comparisonCashflowChart = new Chart(ctx, { type: 'bar', data: { labels: ['Total Income', 'Total Outgoing'], datasets: [ 
-                { label: formatYearMonth(month1.monthYear), data: [totalIncome1, totalOutgoing1], backgroundColor: 'rgba(74, 144, 226, 0.7)', }, 
-                { label: formatYearMonth(month2.monthYear), data: [totalIncome2, totalOutgoing2], backgroundColor: 'rgba(126, 211, 33, 0.7)', } 
-            ] } }); 
+            const datasets = months.map((month, index) => {
+                const totalIncome = calculateTotalIncome(month);
+                const totalOutgoing = calculateTotalMonthlyExpenses(month) + calculateTotalBudgetedSpending(month) + calculateTotalContributions(month);
+                return {
+                    label: formatYearMonth(month.monthYear),
+                    data: [totalIncome, totalOutgoing],
+                    backgroundColor: `hsl(${(index * 53) % 360} 65% 55% / 0.75)`
+                };
+            });
+            comparisonCashflowChart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: ['Total Income', 'Total Outgoing'], datasets },
+                options: { plugins: { legend: { position: 'bottom' } } }
+            }); 
         }
-        function createComparisonSpendingChart(month1, month2) { 
+        function createComparisonSpendingChart(months) { 
             if(comparisonSpendingChart) comparisonSpendingChart.destroy(); 
-            const spending1 = getItemsByType(month1, 'budget').reduce((acc, cat) => { acc[cat.name] = toArray(cat.expenses).reduce((sum, exp) => sum + exp.amount, 0); return acc; }, {}); 
-            const spending2 = getItemsByType(month2, 'budget').reduce((acc, cat) => { acc[cat.name] = toArray(cat.expenses).reduce((sum, exp) => sum + exp.amount, 0); return acc; }, {}); 
-            const allCategoryNames = [...new Set([...Object.keys(spending1), ...Object.keys(spending2)])]; 
-            const data1 = allCategoryNames.map(name => spending1[name] || 0); 
-            const data2 = allCategoryNames.map(name => spending2[name] || 0); 
+            const spendingByMonth = months.map((month) => getItemsByType(month, 'budget').reduce((acc, cat) => {
+                acc[cat.name] = toArray(cat.expenses).reduce((sum, exp) => sum + exp.amount, 0);
+                return acc;
+            }, {}));
+            const allCategoryNames = [...new Set(spendingByMonth.flatMap(spending => Object.keys(spending)))];
+            const datasets = months.map((month, index) => ({
+                label: formatYearMonth(month.monthYear),
+                data: allCategoryNames.map(name => spendingByMonth[index][name] || 0),
+                backgroundColor: `hsl(${(index * 53) % 360} 65% 55% / 0.75)`
+            }));
             const ctx = document.getElementById('comparison-spending-chart').getContext('2d'); 
-            comparisonSpendingChart = new Chart(ctx, { type: 'bar', data: { labels: allCategoryNames, datasets: [ 
-                { label: formatYearMonth(month1.monthYear), data: data1, backgroundColor: 'rgba(74, 144, 226, 0.7)', }, 
-                { label: formatYearMonth(month2.monthYear), data: data2, backgroundColor: 'rgba(126, 211, 33, 0.7)', } 
-            ] }, options: { indexAxis: 'y' } }); 
+            comparisonSpendingChart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: allCategoryNames, datasets },
+                options: { indexAxis: 'y', plugins: { legend: { position: 'bottom' } } }
+            }); 
         }
         // --- END: MODIFIED FUNCTION ---
         
@@ -1681,13 +1749,18 @@
                 return;
             }
             selectors.noComparisonMsg.style.display = 'none';
+            const monthsToCompare = history.slice(0, 6);
             selectors.comparisonChartsArea.innerHTML = `
+                <h3 style="margin: 0 0 10px 0;">Last ${monthsToCompare.length} Months: Leftover / Over Budget</h3>
+                <div id="comparison-monthly-balance-list"></div>
                 <div class="chart-container">
                     <div><h3>Cash Flow Comparison</h3><canvas id="comparison-cashflow-chart"></canvas></div>
                     <div><h3>Spending Comparison</h3><canvas id="comparison-spending-chart"></canvas></div>
                 </div>`;
-            createComparisonCashflowChart(history[0], history[1]);
-            createComparisonSpendingChart(history[0], history[1]);
+            const comparisonMonthlyBalanceList = document.getElementById('comparison-monthly-balance-list');
+            comparisonMonthlyBalanceList.innerHTML = renderComparisonMonthlyBalance(monthsToCompare);
+            createComparisonCashflowChart(monthsToCompare);
+            createComparisonSpendingChart(monthsToCompare);
         }
 
         selectors.addIncomeBtn.addEventListener('click', () => { const name = selectors.incomeNameInput.value.trim(); const amount = parseFloat(selectors.incomeAmountInput.value); if(name && amount > 0) { push(ref(db, `budgets/${currentBudgetId}/income`), { name, amount, isEditing: false }); selectors.incomeNameInput.value = ''; selectors.incomeAmountInput.value = ''; } else { alert('Please enter a valid name and amount.'); } });
@@ -1825,6 +1898,7 @@
         selectors.reviewBtn.addEventListener('click', () => { 
             selectors.reviewRewardsSection.style.display = 'none';
             selectors.reviewExpenseLogSection.style.display = 'none';
+            selectors.singleMonthBalance.style.display = 'none';
             selectors.monthSelect.innerHTML = ''; 
             if (history.length === 0) { 
                 selectors.chartsArea.style.display = 'none'; 
@@ -1849,6 +1923,7 @@
 
         selectors.monthSelect.addEventListener('change', (e) => { 
             const selectedMonthData = history[e.target.value]; 
+            renderSingleMonthBalance(selectedMonthData);
             createCashflowChart(selectedMonthData); 
             createSpendingChart(selectedMonthData);
             renderReviewRewards(selectedMonthData);
