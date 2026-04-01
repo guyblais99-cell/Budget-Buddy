@@ -1348,7 +1348,17 @@
             comparisonCashflowChart = new Chart(ctx, {
                 type: 'bar',
                 data: { labels: ['Total Income', 'Total Outgoing'], datasets },
-                options: { plugins: { legend: { position: 'bottom' } } }
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1000
+                            }
+                        }
+                    },
+                    plugins: { legend: { position: 'bottom' } }
+                }
             }); 
         }
         function createComparisonSpendingChart(months) { 
