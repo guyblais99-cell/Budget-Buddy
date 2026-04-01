@@ -127,9 +127,10 @@
         .modal-header .close-btn { font-size: 1.8em; cursor: pointer; background: none; border: none; padding: 0 10px; color: #333; }
         .chart-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
         #comparison-charts-area .chart-container { grid-template-columns: 1fr; }
-        .chart-container > div { min-height: 300px; position: relative; }
+        .chart-container > div { height: 400px; position: relative; display: flex; flex-direction: column; }
+        .chart-container > div > canvas { flex: 1; }
         @media (max-width: 600px) { 
-            .chart-container > div { min-height: 250px; }
+            .chart-container > div { height: 350px; }
         }
         .confirm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
         #onboarding-modal { display: flex; }
@@ -1367,7 +1368,7 @@
                 data: { labels: allCategoryNames, datasets },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: true,
+                    maintainAspectRatio: false,
                     scales: {
                         y: {
                             beginAtZero: true
