@@ -129,11 +129,9 @@
         #comparison-charts-area .chart-container { grid-template-columns: 1fr; }
         .chart-container > div { position: relative; display: flex; flex-direction: column; }
         .chart-container > div > canvas { flex: 1; }
-        #comparison-charts-area .chart-container > div { min-height: 700px; }
-        #comparison-cashflow-chart, #comparison-spending-chart { height: 100% !important; }
         #comparison-spending-chart { max-height: 400px; }
         @media (max-width: 600px) { 
-            #comparison-charts-area .chart-container > div { min-height: 700px; }
+            #comparison-cashflow-chart { height: 420px !important; }
             #comparison-spending-chart { max-height: 350px; }
         }
         .confirm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
@@ -1356,6 +1354,8 @@
                 type: 'bar',
                 data: { labels: ['Total Income', 'Total Outgoing'], datasets },
                 options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
                     scales: {
                         y: {
                             beginAtZero: true,
