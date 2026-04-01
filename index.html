@@ -1353,7 +1353,11 @@
                         y: {
                             beginAtZero: true,
                             ticks: {
-                                stepSize: 1000
+                                stepSize: 1000,
+                                maxTicksLimit: 10,
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                }
                             }
                         }
                     },
