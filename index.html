@@ -1352,9 +1352,10 @@
                     scales: {
                         y: {
                             beginAtZero: true,
+                            max: Math.max(...datasets.flatMap(d => d.data)) * 1.1,
                             ticks: {
                                 stepSize: 1000,
-                                maxTicksLimit: 10,
+                                precision: 0,
                                 callback: function(value) {
                                     return '$' + value.toLocaleString();
                                 }
