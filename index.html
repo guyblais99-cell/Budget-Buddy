@@ -127,10 +127,11 @@
         .modal-header .close-btn { font-size: 1.8em; cursor: pointer; background: none; border: none; padding: 0 10px; color: #333; }
         .chart-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
         #comparison-charts-area .chart-container { grid-template-columns: 1fr; }
-        .chart-container > div { height: 400px; position: relative; display: flex; flex-direction: column; }
+        .chart-container > div { position: relative; display: flex; flex-direction: column; }
         .chart-container > div > canvas { flex: 1; }
+        #comparison-spending-chart { max-height: 400px; }
         @media (max-width: 600px) { 
-            .chart-container > div { height: 350px; }
+            #comparison-spending-chart { max-height: 350px; }
         }
         .confirm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
         #onboarding-modal { display: flex; }
