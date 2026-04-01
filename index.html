@@ -1455,16 +1455,21 @@
                 const expenses = Object.values(cat.expenses || {}).sort((a,b) => new Date(a.date) - new Date(b.date));
                 const totalSpent = expenses.reduce((s, e) => s + e.amount, 0);
                 const budgetLimit = (cat.limit || 0);
-                const remaining = +(budgetLimit - totalSpent).toFixed(2);
+                const rolloverBalance = (cat.rolloverBalance || 0);
+                const effectiveBudget = cat.type === 'savings' ? budgetLimit : budgetLimit + rolloverBalance;
+                const remaining = +(effectiveBudget - totalSpent).toFixed(2);
                 const overspent = remaining < 0 ? Math.abs(remaining) : 0;
 
                 // pick color from spendingColorMap if available, otherwise fall back to a neutral highlight
                 const colorInfo = spendingColorMap[catName] || { translucent: 'rgba(0,0,0,0.04)', solid: 'rgba(0,0,0,0.06)', border: 'rgba(0,0,0,0.10)' };
+                const rolloverInfoHTML = cat.type === 'savings' || rolloverBalance === 0
+                    ? ''
+                    : `<div style="font-size:0.82em; color:#666; margin-top:2px;">Base ${currencyFormatter.format(budgetLimit)} ${rolloverBalance > 0 ? '+' : '-'} Rollover ${currencyFormatter.format(Math.abs(rolloverBalance))} = ${currencyFormatter.format(effectiveBudget)}</div>`;
 
                 html += `<div class="review-category-block" style="background:${colorInfo.translucent}; border:2px solid ${colorInfo.border}; border-radius:8px; padding:10px; margin-bottom:8px;">
                             <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px;">
-                                <div style="font-weight:700;">${catName}</div>
-                                <div style="text-align:right; font-size:0.95em; color:#333;">${cat.limit ? `${currencyFormatter.format(totalSpent)} of ${currencyFormatter.format(budgetLimit)} budgeted` : `${currencyFormatter.format(totalSpent)} spent`}</div>
+                                <div style="font-weight:700;">${catName}${rolloverInfoHTML}</div>
+                                <div style="text-align:right; font-size:0.95em; color:#333;">${cat.limit ? `${currencyFormatter.format(totalSpent)} of ${currencyFormatter.format(effectiveBudget)} available` : `${currencyFormatter.format(totalSpent)} spent`}</div>
                             </div>
                             <div style="font-size:0.9em; color:#555; margin-bottom:8px;">${overspent > 0 ? `<span style=\"color:var(--expense-color); font-weight:600;\">Overspent by ${currencyFormatter.format(overspent)}</span>` : `<span style=\"color:var(--income-color); font-weight:600;\">Remaining ${currencyFormatter.format(remaining)}</span>`}</div>
                             <div style="background:transparent; border-radius:6px; padding:6px;">
@@ -1749,18 +1754,62 @@
                 return;
             }
             selectors.noComparisonMsg.style.display = 'none';
-            const monthsToCompare = history.slice(0, 6);
             selectors.comparisonChartsArea.innerHTML = `
-                <h3 style="margin: 0 0 10px 0;">Last ${monthsToCompare.length} Months: Leftover / Over Budget</h3>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:12px;">
+                    <div>
+                        <label for="comparison-start-month" style="display:block; font-size:0.9em; margin-bottom:4px;">Start Month (newer)</label>
+                        <select id="comparison-start-month" style="width:100%; padding:8px;"></select>
+                    </div>
+                    <div>
+                        <label for="comparison-end-month" style="display:block; font-size:0.9em; margin-bottom:4px;">End Month (older)</label>
+                        <select id="comparison-end-month" style="width:100%; padding:8px;"></select>
+                    </div>
+                </div>
+                <h3 id="comparison-range-title" style="margin: 0 0 10px 0;"></h3>
                 <div id="comparison-monthly-balance-list"></div>
                 <div class="chart-container">
                     <div><h3>Cash Flow Comparison</h3><canvas id="comparison-cashflow-chart"></canvas></div>
                     <div><h3>Spending Comparison</h3><canvas id="comparison-spending-chart"></canvas></div>
                 </div>`;
+
+            const startSelect = document.getElementById('comparison-start-month');
+            const endSelect = document.getElementById('comparison-end-month');
+            const titleEl = document.getElementById('comparison-range-title');
             const comparisonMonthlyBalanceList = document.getElementById('comparison-monthly-balance-list');
-            comparisonMonthlyBalanceList.innerHTML = renderComparisonMonthlyBalance(monthsToCompare);
-            createComparisonCashflowChart(monthsToCompare);
-            createComparisonSpendingChart(monthsToCompare);
+
+            history.forEach((month, index) => {
+                const label = formatYearMonth(month.monthYear);
+                startSelect.innerHTML += `<option value="${index}">${label}</option>`;
+                endSelect.innerHTML += `<option value="${index}">${label}</option>`;
+            });
+
+            startSelect.value = '0';
+            endSelect.value = String(Math.min(5, history.length - 1));
+
+            const renderSelectedRange = () => {
+                const startIdx = parseInt(startSelect.value, 10);
+                const endIdx = parseInt(endSelect.value, 10);
+                const rangeStart = Math.min(startIdx, endIdx);
+                const rangeEnd = Math.max(startIdx, endIdx);
+                const monthsToCompare = history.slice(rangeStart, rangeEnd + 1);
+
+                if (monthsToCompare.length < 2) {
+                    titleEl.textContent = 'Select at least 2 months to compare';
+                    comparisonMonthlyBalanceList.innerHTML = '';
+                    if (comparisonCashflowChart) comparisonCashflowChart.destroy();
+                    if (comparisonSpendingChart) comparisonSpendingChart.destroy();
+                    return;
+                }
+
+                titleEl.textContent = `${monthsToCompare.length} Month Comparison: Leftover / Over Budget`;
+                comparisonMonthlyBalanceList.innerHTML = renderComparisonMonthlyBalance(monthsToCompare);
+                createComparisonCashflowChart(monthsToCompare);
+                createComparisonSpendingChart(monthsToCompare);
+            };
+
+            startSelect.addEventListener('change', renderSelectedRange);
+            endSelect.addEventListener('change', renderSelectedRange);
+            renderSelectedRange();
         }
 
         selectors.addIncomeBtn.addEventListener('click', () => { const name = selectors.incomeNameInput.value.trim(); const amount = parseFloat(selectors.incomeAmountInput.value); if(name && amount > 0) { push(ref(db, `budgets/${currentBudgetId}/income`), { name, amount, isEditing: false }); selectors.incomeNameInput.value = ''; selectors.incomeAmountInput.value = ''; } else { alert('Please enter a valid name and amount.'); } });
