@@ -2053,20 +2053,27 @@
             const { key, type, categoryKey, expenseKey } = button.dataset;
             const dbPath = type === 'income' ? 'income' : 'monthlyExpenses';
 
-            if (button.classList.contains('add-expense-to-category-btn')) {
+            if (button.classList.contains('add-expense-to-category-btn') || button.classList.contains('withdraw-from-goal-btn')) {
                 const form = button.closest('.new-expense-form');
-                const catKey = form.closest('.budget-category').querySelector('.budget-category-header').dataset.key;
+                if (!form) { alert('Error: Could not find form. Please refresh and try again.'); return; }
+                const categoryDiv = form.closest('.budget-category');
+                if (!categoryDiv) { alert('Error: Could not find category. Please refresh and try again.'); return; }
+                const headerDiv = categoryDiv.querySelector('.budget-category-header');
+                if (!headerDiv) { alert('Error: Could not find category header. Please refresh and try again.'); return; }
+                const catKey = headerDiv.dataset.key;
+                if (!catKey) { alert('Error: Could not find category ID. Please refresh and try again.'); return; }
                 const amountInput = form.querySelector('.expense-amount-input');
                 const noteInput = form.querySelector('.expense-note-input');
+                if (!amountInput) { alert('Error: Could not find amount input. Please refresh and try again.'); return; }
                 const amount = parseFloat(amountInput.value);
                 const note = noteInput.value.trim();
-                const isSavingsCategory = state.budgetedItems[catKey]?.type === 'savings';
-                const isValidAmount = isSavingsCategory ? !isNaN(amount) && amount !== 0 : amount > 0;
-                if (isValidAmount) {
-                    push(ref(db, `budgets/${currentBudgetId}/budgetedItems/${catKey}/expenses`), { amount, note, date: new Date().toLocaleDateString(), isEditing: false });
-                    updateChallengeProgress({ categoryKey: catKey, amount });
+                const isWithdrawAction = button.classList.contains('withdraw-from-goal-btn');
+                const signedAmount = isWithdrawAction ? -Math.abs(amount) : amount;
+                if (amount > 0) {
+                    push(ref(db, `budgets/${currentBudgetId}/budgetedItems/${catKey}/expenses`), { amount: signedAmount, note, date: new Date().toLocaleDateString(), isEditing: false });
+                    updateChallengeProgress({ categoryKey: catKey, amount: signedAmount });
                     amountInput.value = ''; noteInput.value = '';
-                } else { alert(`Please enter a valid ${isSavingsCategory ? 'non-zero' : 'positive'} amount.`); }
+                } else { alert('Please enter a valid amount.'); }
             } 
             else if (button.classList.contains('delete-expense-btn')) { 
                 const oldExpense = state.budgetedItems[categoryKey]?.expenses[expenseKey]; 
