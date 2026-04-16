@@ -1252,9 +1252,18 @@
                         }
                     }
                 }
-                const expenseLogsHTML = item.expenses ? Object.entries(item.expenses).map(([expKey, exp]) => { if (exp.isEditing) { return `<li class="edit-expense-form"><div class="input-group"><input type="number" class="edit-expense-amount-input" value="${exp.amount.toFixed(2)}"><input type="text" class="edit-expense-note-input" placeholder="Note" value="${exp.note || ''}"><input type="date" class="edit-expense-date-input" value="${toInputDate(exp.date)}"></div><div style="margin-top:5px; display:flex; gap:5px;"><button class="save-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">Save</button><button class="cancel-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}" style="background-color:#777">Cancel</button></div></li>`; } return `<li><span class="amount">${currencyFormatter.format(exp.amount)}</span><span class="note">${exp.note}</span><span class="date-stamp">${exp.date || ''}</span><div style="display:flex; gap:5px;"><button class="icon-btn edit-btn edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">✏️</button><button class="icon-btn delete-btn delete-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">✖</button></div></li>`; }).join('') : ''; 
+                const expenseLogsHTML = item.expenses ? Object.entries(item.expenses).map(([expKey, exp]) => {
+                    if (exp.isEditing) {
+                        return `<li class="edit-expense-form"><div class="input-group"><input type="number" class="edit-expense-amount-input" value="${exp.amount.toFixed(2)}"><input type="text" class="edit-expense-note-input" placeholder="Note" value="${exp.note || ''}"><input type="date" class="edit-expense-date-input" value="${toInputDate(exp.date)}"></div><div style="margin-top:5px; display:flex; gap:5px;"><button class="save-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">Save</button><button class="cancel-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}" style="background-color:#777">Cancel</button></div></li>`;
+                    }
+                    const isWithdrawal = isSavings && exp.amount < 0;
+                    const amountText = isWithdrawal ? currencyFormatter.format(Math.abs(exp.amount)) : currencyFormatter.format(exp.amount);
+                    const amountStyle = isWithdrawal ? 'color: var(--expense-color);' : '';
+                    const typeLabel = isWithdrawal ? '<span style="color: var(--expense-color); font-weight: 600; margin-right: 6px;">Withdraw</span>' : '';
+                    return `<li><span class="amount" style="${amountStyle}">${typeLabel}${amountText}</span><span class="note">${exp.note}</span><span class="date-stamp">${exp.date || ''}</span><div style="display:flex; gap:5px;"><button class="icon-btn edit-btn edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">✏️</button><button class="icon-btn delete-btn delete-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">✖</button></div></li>`;
+                }).join('') : ''; 
                 const reorderControlsHTML = isSavings ? '' : `<span class="reorder-controls"><button class="move-btn move-up-btn" data-key="${key}" ${index === 0 ? 'disabled' : ''}>🔼</button><button class="move-btn move-down-btn" data-key="${key}" ${index === sortedItems.length - 1 ? 'disabled' : ''}>🔽</button></span>`; 
-                itemDiv.innerHTML = `<div class="budget-category-header" data-key="${key}"><span style="display: flex; align-items: center;">${challengeBadgeHTML}${reorderControlsHTML}${sinkingFundIcon}${item.name}</span><div style="display: flex; align-items: center; gap: 5px;"><button class="icon-btn edit-btn" data-key="${key}">✏️</button><button class="icon-btn delete-btn" data-key="${key}" data-type="category">✖</button><span class="toggle-icon" style="margin-left: 15px;">▼</span></div></div>${editFormHTML}<div class="budget-summary-text">${summaryText}</div><div class="progress-bar"><div class="progress-bar-inner" style="width: ${progressPercent}%; background-color: ${barColor};"></div>${!isSavings ? `<div class="progress-bar-inner progress-bar-overspent" style="width: ${overspentPercent}%;"></div>` : ''}</div><div class="budget-category-content">${sinkingFundDetailsHTML}${lastMonthSpendingHTML}<div class="new-expense-form"><div class="input-group"><input type="number" placeholder="Amount" class="expense-amount-input" min="0" step="0.01"><input type="text" placeholder="Note (optional)" class="expense-note-input"><button class="add-expense-to-category-btn">${isSavings ? 'Add Contribution' : 'Add Expense'}</button></div></div><ul class="expense-log">${expenseLogsHTML}</ul></div>`;
+                itemDiv.innerHTML = `<div class="budget-category-header" data-key="${key}"><span style="display: flex; align-items: center;">${challengeBadgeHTML}${reorderControlsHTML}${sinkingFundIcon}${item.name}</span><div style="display: flex; align-items: center; gap: 5px;"><button class="icon-btn edit-btn" data-key="${key}">✏️</button><button class="icon-btn delete-btn" data-key="${key}" data-type="category">✖</button><span class="toggle-icon" style="margin-left: 15px;">▼</span></div></div>${editFormHTML}<div class="budget-summary-text">${summaryText}</div><div class="progress-bar"><div class="progress-bar-inner" style="width: ${progressPercent}%; background-color: ${barColor};"></div>${!isSavings ? `<div class="progress-bar-inner progress-bar-overspent" style="width: ${overspentPercent}%;"></div>` : ''}</div><div class="budget-category-content">${sinkingFundDetailsHTML}${lastMonthSpendingHTML}<div class="new-expense-form"><div class="input-group"><input type="number" placeholder="Amount" class="expense-amount-input" min="0" step="0.01"><input type="text" placeholder="Note (optional)" class="expense-note-input"><button class="add-expense-to-category-btn">${isSavings ? 'Add Contribution' : 'Add Expense'}</button>${isSavings ? '<button class="withdraw-from-goal-btn btn-red" type="button">Withdraw</button>' : ''}</div></div><ul class="expense-log">${expenseLogsHTML}</ul></div>`;
                 parentList.appendChild(itemDiv); 
             }); 
         }
@@ -2043,16 +2052,18 @@
             const { key, type, categoryKey, expenseKey } = button.dataset;
             const dbPath = type === 'income' ? 'income' : 'monthlyExpenses';
 
-            if (button.classList.contains('add-expense-to-category-btn')) {
+            if (button.classList.contains('add-expense-to-category-btn') || button.classList.contains('withdraw-from-goal-btn')) {
                 const form = button.closest('.new-expense-form');
                 const catKey = form.closest('.budget-category').querySelector('.budget-category-header').dataset.key;
                 const amountInput = form.querySelector('.expense-amount-input');
                 const noteInput = form.querySelector('.expense-note-input');
                 const amount = parseFloat(amountInput.value);
                 const note = noteInput.value.trim();
+                const isWithdrawAction = button.classList.contains('withdraw-from-goal-btn');
+                const signedAmount = isWithdrawAction ? -amount : amount;
                 if (amount > 0) {
-                    push(ref(db, `budgets/${currentBudgetId}/budgetedItems/${catKey}/expenses`), { amount, note, date: new Date().toLocaleDateString(), isEditing: false });
-                    updateChallengeProgress({ categoryKey: catKey, amount });
+                    push(ref(db, `budgets/${currentBudgetId}/budgetedItems/${catKey}/expenses`), { amount: signedAmount, note, date: new Date().toLocaleDateString(), isEditing: false });
+                    updateChallengeProgress({ categoryKey: catKey, amount: signedAmount });
                     amountInput.value = ''; noteInput.value = '';
                 } else { alert('Please enter a valid amount.'); }
             } 
@@ -2143,7 +2154,10 @@
 
                 const oldExpense = state.budgetedItems[categoryKey]?.expenses[expenseKey]; 
 
-                if (newAmount > 0 && dateValue) { 
+                const isSavingsCategory = state.budgetedItems[categoryKey]?.type === 'savings';
+                const isValidAmount = isSavingsCategory ? !isNaN(newAmount) && newAmount !== 0 : newAmount > 0;
+
+                if (isValidAmount && dateValue) { 
                     const newDate = new Date(dateValue + 'T00:00:00').toLocaleDateString();
                     update(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses/${expenseKey}`), { date: newDate, amount: newAmount, note: newNote, isEditing: false }); 
                     
@@ -2153,7 +2167,7 @@
                         updateChallengeProgress({ categoryKey, amount: newAmount });
                     }
                 } else { 
-                    alert('Please enter a valid amount and select a date.'); 
+                    alert(`Please enter a valid ${isSavingsCategory ? 'non-zero' : 'positive'} amount and select a date.`); 
                 } 
             } 
             else if (button.classList.contains('cancel-edit-btn')) { set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}/isEditing`), false); } 
