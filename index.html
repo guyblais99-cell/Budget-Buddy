@@ -488,7 +488,16 @@
              <div class="section-header"><h3>🏦 Savings Goals</h3></div>
             <div class="section-content" id="savings-goals-list"></div>
             <button class="add-category-btn" id="add-savings-goal-btn">+ New Savings Goal</button>
-            <div class="hidden-form" id="new-savings-goal-form" style="display: none;"><div class="input-group"><input type="text" id="savings-goal-name-input" placeholder="Goal Name (e.g., Vacation)"><input type="number" id="savings-goal-amount-input" placeholder="Goal Amount" min="0" step="0.01"><button id="save-savings-goal-btn">Save Goal</button></div></div>
+            <div class="hidden-form" id="new-savings-goal-form" style="display: none;">
+                <div class="input-group"><input type="text" id="savings-goal-name-input" placeholder="Goal Name (e.g., Vacation)"><input type="number" id="savings-goal-amount-input" placeholder="Monthly Allocation" min="0" step="0.01"></div>
+                <div class="setting-toggle" style="padding: 5px 0; font-weight: normal;">
+                    <label for="savings-use-monthly-allocation">Count toward monthly allocation
+                        <span class="tooltip-container"><span class="info-icon">?</span><span class="tooltip-text">Checked: this goal uses your budget allocation (e.g. main savings). Unchecked: a dream goal you track with manual contributions only — it won't affect Remaining to Allocate.</span></span>
+                    </label>
+                    <input type="checkbox" id="savings-use-monthly-allocation" checked>
+                </div>
+                <button id="save-savings-goal-btn" style="margin-top: 8px;">Save Goal</button>
+            </div>
         </div>
     </div>
 
@@ -666,7 +675,7 @@
             sinkingFundGoalInput: document.getElementById('sinking-fund-goal-input'),
             sinkingFundMonthsInput: document.getElementById('sinking-fund-months-input'),
 
-            savingsGoalsList: document.getElementById('savings-goals-list'), addSavingsGoalBtn: document.getElementById('add-savings-goal-btn'), newSavingsGoalForm: document.getElementById('new-savings-goal-form'), savingsGoalNameInput: document.getElementById('savings-goal-name-input'), savingsGoalAmountInput: document.getElementById('savings-goal-amount-input'), saveSavingsGoalBtn: document.getElementById('save-savings-goal-btn'),
+            savingsGoalsList: document.getElementById('savings-goals-list'), addSavingsGoalBtn: document.getElementById('add-savings-goal-btn'), newSavingsGoalForm: document.getElementById('new-savings-goal-form'), savingsGoalNameInput: document.getElementById('savings-goal-name-input'), savingsGoalAmountInput: document.getElementById('savings-goal-amount-input'), savingsUseMonthlyAllocation: document.getElementById('savings-use-monthly-allocation'), saveSavingsGoalBtn: document.getElementById('save-savings-goal-btn'),
             incomeExpensesSection: document.getElementById('income-expenses-section'),
             allocationSection: document.getElementById('allocation-section'),
             summaryTotalIncome: document.getElementById('summary-total-income'), summaryTotalExpenses: document.getElementById('summary-total-expenses'),
@@ -952,10 +961,16 @@
                     }
                     let newLimit = item.limit; 
                     let rolloverBalance = 0; 
-                    if (item.type !== 'savings' && item.rolloverEnabled) {
+                    if (item.type === 'savings') {
+                        const monthActivity = (item.expenses ? Object.values(item.expenses) : []).reduce((sum, exp) => sum + exp.amount, 0);
+                        const savedBalance = (item.savedBalance || 0) + monthActivity;
+                        acc[key] = { ...item, limit: newLimit, savedBalance, rolloverBalance: 0, expenses: {}, isEditing: false };
+                    } else if (item.rolloverEnabled) {
                         rolloverBalance = unspent;
+                        acc[key] = { ...item, limit: newLimit, rolloverBalance: rolloverBalance, expenses: {}, isEditing: false };
+                    } else {
+                        acc[key] = { ...item, limit: newLimit, rolloverBalance: rolloverBalance, expenses: {}, isEditing: false };
                     }
-                    acc[key] = { ...item, limit: newLimit, rolloverBalance: rolloverBalance, expenses: {}, isEditing: false };
                     return acc;
                 }, {}) : {};
 
@@ -1081,9 +1096,16 @@
         const calculateTotalAllocatedToBudgets = (data) => getItemsByType(data, 'budget').reduce((sum, cat) => sum + cat.limit, 0);
         const calculateTotalSpendableInBudgets = (data) => getItemsByType(data, 'budget').reduce((sum, cat) => sum + (cat.limit + (cat.rolloverBalance || 0)), 0);
 
-        const calculateTotalAllocatedToSavings = (data) => getItemsByType(data, 'savings').reduce((sum, cat) => sum + cat.limit, 0);
+        const savingsUsesMonthlyAllocation = (item) => item.useMonthlyAllocation !== false;
+        const calculateTotalAllocatedToSavings = (data) => getItemsByType(data, 'savings').filter(savingsUsesMonthlyAllocation).reduce((sum, cat) => sum + cat.limit, 0);
+        function updateSavingsAmountPlaceholder(inputEl, useMonthlyAllocation) {
+            if (!inputEl) return;
+            inputEl.placeholder = useMonthlyAllocation ? 'Monthly Allocation' : 'Goal Amount';
+        }
         const calculateTotalBudgetedSpending = (data) => getItemsByType(data, 'budget').flatMap(cat => toArray(cat.expenses)).reduce((sum, exp) => sum + exp.amount, 0);
         const calculateTotalContributions = (data) => getItemsByType(data, 'savings').flatMap(cat => toArray(cat.expenses)).reduce((sum, exp) => sum + exp.amount, 0);
+        const getSavingsMonthActivity = (item) => toArray(item.expenses).reduce((sum, exp) => sum + exp.amount, 0);
+        const getSavingsTotalBalance = (item) => (item.savedBalance || 0) + getSavingsMonthActivity(item);
         const calculateMonthlyNet = (data) => calculateTotalSpendableInBudgets(data) - calculateTotalBudgetedSpending(data);
         const calculateMonthlyNetIncludingSavings = (data) => calculateMonthlyNet(data) + calculateTotalAllocatedToSavings(data);
         const calculateSpentInCategory = (categoryKey) => toArray(state.budgetedItems?.[categoryKey]?.expenses).reduce((sum, exp) => sum + exp.amount, 0);
@@ -1189,10 +1211,11 @@
             let sortedItems = Object.entries(state.budgetedItems).map(([key, cat], index) => { if (cat.order === undefined) { cat.order = index; updates[`/budgetedItems/${key}/order`] = index; } return [key, cat]; }); if (Object.keys(updates).length > 0) { update(dbRef, updates); } sortedItems.sort((a, b) => a[1].order - b[1].order); const isReordering = selectors.budgetCategoriesList.classList.contains('reordering-active'); 
             sortedItems.forEach(([key, item], index) => { 
                 const isSinkingFund = item.isSinkingFund === true;
+                const isSavings = item.type === 'savings';
                 const sinkingFundIcon = isSinkingFund ? '🏦 ' : '';
+                const savingsTypeIcon = isSavings ? (savingsUsesMonthlyAllocation(item) ? '💰 ' : '✨ ') : '';
                 const challengeBadge = challengedCategoryInfo[key];
-                const challengeBadgeHTML = challengeBadge ? `<span class="category-challenge-badge" title="This category has an active challenge!">${challengeBadge}</span>` : '';
-                const isSavings = item.type === 'savings'; 
+                const challengeBadgeHTML = challengeBadge ? `<span class="category-challenge-badge" title="This category has an active challenge!">${challengeBadge}</span>` : ''; 
                 const parentList = isSavings ? selectors.savingsGoalsList : selectors.budgetCategoriesList; 
                 const itemDiv = document.createElement('div'); 
                 itemDiv.className = `budget-category ${item.collapsed ? 'collapsed' : ''} ${item.isEditing ? 'is-editing' : ''}`;
@@ -1205,16 +1228,34 @@
                         if (!isSavings) {
                             rolloverControlHTML = `<div class="setting-toggle" style="padding: 5px 0; font-weight: normal;"><label for="edit-rollover-${key}">Rollover unspent funds<span class="tooltip-container"><span class="info-icon">?</span><span class="tooltip-text">If checked, any money left in this category at the end of the month will be added to next month's budget for this same category.</span></span></label><input type="checkbox" id="edit-rollover-${key}" class="edit-rollover-toggle" ${item.rolloverEnabled ? 'checked' : ''}></div>`;
                         }
-                        editFormHTML = `<div class="edit-category-form"><p><strong>Edit ${isSavings ? 'Goal' : 'Category'}</strong></p><div class="input-group"><input type="text" class="edit-name-input" value="${item.name}"><input type="number" class="edit-limit-input" value="${item.limit.toFixed(2)}" min="0" step="0.01"></div>${rolloverControlHTML}<div style="margin-top: 10px; display: flex; gap: 10px;"><button class="save-edit-btn" data-key="${key}">Save</button><button class="cancel-edit-btn" data-key="${key}" style="background-color: #777;">Cancel</button></div></div>`;
+                        if (isSavings) {
+                            const usesAllocation = savingsUsesMonthlyAllocation(item);
+                            const savingsSettingsHTML = `<div class="setting-toggle" style="padding: 5px 0; font-weight: normal;"><label for="edit-savings-allocation-${key}">Count toward monthly allocation<span class="tooltip-container"><span class="info-icon">?</span><span class="tooltip-text">Checked: counts in Allocation Center. Unchecked: dream goal — track contributions only.</span></span></label><input type="checkbox" id="edit-savings-allocation-${key}" class="edit-savings-allocation-toggle" ${usesAllocation ? 'checked' : ''}></div>`;
+                            editFormHTML = `<div class="edit-category-form"><p><strong>Edit Goal</strong></p><p style="font-size:0.85em; color:#555; margin:0 0 8px;">Your saved balance rolls over each month. ${usesAllocation ? 'Monthly allocation is part of your zero-based budget.' : 'Dream goals are tracked separately from your monthly allocation.'}</p><div class="input-group"><input type="text" class="edit-name-input" value="${item.name}"><input type="number" class="edit-limit-input" value="${item.limit.toFixed(2)}" min="0" step="0.01" placeholder="${usesAllocation ? 'Monthly Allocation' : 'Goal Amount'}"></div>${savingsSettingsHTML}<div style="margin-top: 10px; display: flex; gap: 10px;"><button class="save-edit-btn" data-key="${key}">Save</button><button class="cancel-edit-btn" data-key="${key}" style="background-color: #777;">Cancel</button></div></div>`;
+                        } else {
+                            editFormHTML = `<div class="edit-category-form"><p><strong>Edit Category</strong></p><div class="input-group"><input type="text" class="edit-name-input" value="${item.name}"><input type="number" class="edit-limit-input" value="${item.limit.toFixed(2)}" min="0" step="0.01"></div>${rolloverControlHTML}<div style="margin-top: 10px; display: flex; gap: 10px;"><button class="save-edit-btn" data-key="${key}">Save</button><button class="cancel-edit-btn" data-key="${key}" style="background-color: #777;">Cancel</button></div></div>`;
+                        }
                     }
                 }
                 const totalContributions = toArray(item.expenses).reduce((sum, exp) => sum + exp.amount, 0); 
                 let progressPercent, barColor, overspentPercent = 0, summaryText; 
                 if (isSavings) { 
-                    progressPercent = item.limit > 0 ? Math.min(100, 100 * (totalContributions / item.limit)) : 0; 
-                    barColor = 'var(--income-color)'; 
-                    summaryText = `${currencyFormatter.format(totalContributions)} saved of ${currencyFormatter.format(item.limit)} goal`; 
-                } else { 
+                    const savedBalance = item.savedBalance || 0;
+                    const totalSaved = savedBalance + totalContributions;
+                    const usesAllocation = savingsUsesMonthlyAllocation(item);
+                    barColor = 'var(--income-color)';
+                    if (usesAllocation) {
+                        progressPercent = item.limit > 0 ? Math.min(100, 100 * (totalContributions / item.limit)) : 0;
+                        summaryText = `${currencyFormatter.format(totalSaved)} saved · Monthly allocation: ${currencyFormatter.format(item.limit)}`;
+                    } else {
+                        progressPercent = item.limit > 0 ? Math.min(100, 100 * (totalSaved / item.limit)) : 0;
+                        summaryText = `${currencyFormatter.format(totalSaved)} saved of ${currencyFormatter.format(item.limit)} goal`;
+                    }
+                    if (totalContributions !== 0) {
+                        const sign = totalContributions > 0 ? '+' : '';
+                        summaryText += ` <span style="font-size: 0.9em; color: ${totalContributions > 0 ? 'var(--income-color)' : 'var(--expense-color)'};">(${sign}${currencyFormatter.format(totalContributions)} this month)</span>`;
+                    }
+                } else {
                     const rollover = item.rolloverBalance || 0; 
                     const effectiveBudget = item.limit + rollover; 
                     const amountLeft = (effectiveBudget - totalContributions); 
@@ -1264,7 +1305,7 @@
                 }).join('') : ''; 
                 const reorderControlsHTML = isSavings ? '' : `<span class="reorder-controls"><button class="move-btn move-up-btn" data-key="${key}" ${index === 0 ? 'disabled' : ''}>🔼</button><button class="move-btn move-down-btn" data-key="${key}" ${index === sortedItems.length - 1 ? 'disabled' : ''}>🔽</button></span>`; 
                 const buttonsHTML = isSavings ? `<div style="display: flex; flex-direction: column; gap: 8px; width: 100%;"><button class="add-expense-to-category-btn" style="flex: 1;">Add Contribution</button><button class="withdraw-from-goal-btn btn-red" type="button" style="flex: 1;">Withdraw</button></div>` : `<button class="add-expense-to-category-btn">Add Expense</button>`;
-                itemDiv.innerHTML = `<div class="budget-category-header" data-key="${key}"><span style="display: flex; align-items: center;">${challengeBadgeHTML}${reorderControlsHTML}${sinkingFundIcon}${item.name}</span><div style="display: flex; align-items: center; gap: 5px;"><button class="icon-btn edit-btn" data-key="${key}">✏️</button><button class="icon-btn delete-btn" data-key="${key}" data-type="category">✖</button><span class="toggle-icon" style="margin-left: 15px;">▼</span></div></div>${editFormHTML}<div class="budget-summary-text">${summaryText}</div><div class="progress-bar"><div class="progress-bar-inner" style="width: ${progressPercent}%; background-color: ${barColor};"></div>${!isSavings ? `<div class="progress-bar-inner progress-bar-overspent" style="width: ${overspentPercent}%;"></div>` : ''}</div><div class="budget-category-content">${sinkingFundDetailsHTML}${lastMonthSpendingHTML}<div class="new-expense-form"><div class="input-group"><input type="number" placeholder="Amount" class="expense-amount-input" ${isSavings ? '' : 'min="0"'} step="0.01"><input type="text" placeholder="Note (optional)" class="expense-note-input"></div>${buttonsHTML}</div><ul class="expense-log">${expenseLogsHTML}</ul></div>`;
+                itemDiv.innerHTML = `<div class="budget-category-header" data-key="${key}"><span style="display: flex; align-items: center;">${challengeBadgeHTML}${reorderControlsHTML}${sinkingFundIcon}${savingsTypeIcon}${item.name}</span><div style="display: flex; align-items: center; gap: 5px;"><button class="icon-btn edit-btn" data-key="${key}">✏️</button><button class="icon-btn delete-btn" data-key="${key}" data-type="category">✖</button><span class="toggle-icon" style="margin-left: 15px;">▼</span></div></div>${editFormHTML}<div class="budget-summary-text">${summaryText}</div><div class="progress-bar"><div class="progress-bar-inner" style="width: ${progressPercent}%; background-color: ${barColor};"></div>${!isSavings ? `<div class="progress-bar-inner progress-bar-overspent" style="width: ${overspentPercent}%;"></div>` : ''}</div><div class="budget-category-content">${sinkingFundDetailsHTML}${lastMonthSpendingHTML}<div class="new-expense-form"><div class="input-group"><input type="number" placeholder="Amount" class="expense-amount-input" ${isSavings ? '' : 'min="0"'} step="0.01"><input type="text" placeholder="Note (optional)" class="expense-note-input"></div>${buttonsHTML}</div><ul class="expense-log">${expenseLogsHTML}</ul></div>`;
                 parentList.appendChild(itemDiv); 
             }); 
         }
@@ -1497,7 +1538,12 @@
             const budgetItems = monthData.budgetedItems || {};
             const categories = Object.entries(budgetItems).map(([key, cat]) => ({ key, ...cat }));
             // Only keep categories that have expenses
-            const categoriesWithExpenses = categories.filter(cat => cat.expenses && Object.keys(cat.expenses).length > 0);
+            const categoriesWithExpenses = categories.filter(cat => {
+                if (cat.type === 'savings') {
+                    return (cat.savedBalance > 0) || (cat.expenses && Object.keys(cat.expenses).length > 0);
+                }
+                return cat.expenses && Object.keys(cat.expenses).length > 0;
+            });
             if (categoriesWithExpenses.length === 0) { reviewExpenseLogSection.style.display = 'none'; return; }
 
             // Build HTML grouped by category
@@ -1508,13 +1554,49 @@
                 const totalSpent = expenses.reduce((s, e) => s + e.amount, 0);
                 const budgetLimit = (cat.limit || 0);
                 const rolloverBalance = (cat.rolloverBalance || 0);
-                const effectiveBudget = cat.type === 'savings' ? budgetLimit : budgetLimit + rolloverBalance;
+                const isSavingsCategory = cat.type === 'savings';
+                const savedBalance = cat.savedBalance || 0;
+
+                if (isSavingsCategory) {
+                    const totalSaved = savedBalance + totalSpent;
+                    const monthNetLabel = totalSpent >= 0 ? 'Contributed' : 'Net change';
+                    const monthSummary = totalSpent === 0
+                        ? `No activity this month`
+                        : `${monthNetLabel} ${currencyFormatter.format(Math.abs(totalSpent))} this month`;
+                    const usesAllocation = savingsUsesMonthlyAllocation(cat);
+                    const limitInfo = budgetLimit > 0
+                        ? `<div style="font-size:0.82em; color:#666; margin-top:2px;">${usesAllocation ? 'Monthly allocation' : 'Goal'}: ${currencyFormatter.format(budgetLimit)}</div>`
+                        : '';
+                    const reviewIcon = usesAllocation ? '💰' : '✨';
+
+                    html += `<div class="review-category-block" style="background:rgba(46, 204, 113, 0.08); border:2px solid rgba(46, 204, 113, 0.35); border-radius:8px; padding:10px; margin-bottom:8px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px;">
+                                    <div style="font-weight:700;">${reviewIcon} ${catName}${limitInfo}</div>
+                                    <div style="text-align:right; font-size:0.95em; color:#333;">${currencyFormatter.format(totalSaved)} saved</div>
+                                </div>
+                                <div style="font-size:0.9em; color:#555; margin-bottom:8px;"><span style="color:var(--income-color); font-weight:600;">${monthSummary}</span></div>
+                                <div style="background:transparent; border-radius:6px; padding:6px;">
+                                    <div style="display:flex; flex-direction:column; gap:6px;">
+`;
+                    expenses.forEach(exp => {
+                        const isWithdrawal = exp.amount < 0;
+                        const amountText = currencyFormatter.format(Math.abs(exp.amount));
+                        const typeLabel = isWithdrawal ? 'Withdraw' : 'Contribution';
+                        html += `<div style="display:flex; justify-content:space-between; padding:6px; background:rgba(255,255,255,0.35); border-radius:6px;"><div style="max-width:75%; word-break:break-word;"><strong>${typeLabel}: ${amountText}</strong> - <span style="color:#666; font-style:italic;">${exp.note || 'No note'}</span></div><div style="color:#888; white-space:nowrap; margin-left:10px;">${exp.date || ''}</div></div>`;
+                    });
+                    html += `        </div>
+                                    </div>
+                            </div>`;
+                    return;
+                }
+
+                const effectiveBudget = budgetLimit + rolloverBalance;
                 const remaining = +(effectiveBudget - totalSpent).toFixed(2);
                 const overspent = remaining < 0 ? Math.abs(remaining) : 0;
 
                 // pick color from spendingColorMap if available, otherwise fall back to a neutral highlight
                 const colorInfo = spendingColorMap[catName] || { translucent: 'rgba(0,0,0,0.04)', solid: 'rgba(0,0,0,0.06)', border: 'rgba(0,0,0,0.10)' };
-                const rolloverInfoHTML = cat.type === 'savings' || rolloverBalance === 0
+                const rolloverInfoHTML = rolloverBalance === 0
                     ? ''
                     : `<div style="font-size:0.82em; color:#666; margin-top:2px;">Base ${currencyFormatter.format(budgetLimit)} ${rolloverBalance > 0 ? '+' : '-'} Rollover ${currencyFormatter.format(Math.abs(rolloverBalance))} = ${currencyFormatter.format(effectiveBudget)}</div>`;
 
@@ -1547,7 +1629,14 @@
                 const itemType = definition.requires === 'budgetCategory' ? 'budget' : 'savings';
                 const categories = Object.entries(state.budgetedItems || {}).filter(([k, v]) => (v.type || 'budget') === itemType);
                 if (categories.length === 0) { showChallengeAlert(`You need to create at least one ${itemType === 'budget' ? 'spending category' : 'savings goal'} to start this challenge.`); return; }
-                inputs.push({ type: 'select', id: 'category', label: `Select a category for this challenge:`, options: categories.map(([key, cat]) => ({ value: key, text: `${cat.name} (${currencyFormatter.format(cat.limit)})` })) });
+                inputs.push({ type: 'select', id: 'category', label: `Select a category for this challenge:`, options: categories.map(([key, cat]) => {
+                    const limitLabel = itemType === 'savings' && !savingsUsesMonthlyAllocation(cat)
+                        ? `${currencyFormatter.format(cat.limit)} goal`
+                        : itemType === 'savings'
+                            ? `${currencyFormatter.format(cat.limit)}/mo`
+                            : currencyFormatter.format(cat.limit);
+                    return { value: key, text: `${cat.name} (${limitLabel})` };
+                }) });
             }
             if (definition.prompt?.amount) { inputs.push({ type: 'number', id: 'amount', label: definition.prompt.amount }); }
             if (definition.prompt?.days) { inputs.push({ type: 'number', id: 'days', label: definition.prompt.days }); }
@@ -1937,8 +2026,40 @@
             selectors.newCategoryForm.style.display = 'none'; 
         });
 
-        selectors.addSavingsGoalBtn.addEventListener('click', () => { selectors.newSavingsGoalForm.style.display = 'block'; selectors.savingsGoalNameInput.focus(); });
-        selectors.saveSavingsGoalBtn.addEventListener('click', () => { const name = selectors.savingsGoalNameInput.value.trim(); const limit = parseFloat(selectors.savingsGoalAmountInput.value); if (name && limit > 0) { const newOrder = state.budgetedItems ? Object.keys(state.budgetedItems).length : 0; push(ref(db, `budgets/${currentBudgetId}/budgetedItems`), { name, limit, expenses: {}, collapsed: true, isEditing: false, order: newOrder, type: 'savings' }); selectors.savingsGoalNameInput.value = ''; selectors.savingsGoalAmountInput.value = ''; selectors.newSavingsGoalForm.style.display = 'none'; } else { alert('Please enter a valid goal name and amount.'); } });
+        selectors.addSavingsGoalBtn.addEventListener('click', () => {
+            selectors.newSavingsGoalForm.style.display = 'block';
+            selectors.savingsUseMonthlyAllocation.checked = true;
+            updateSavingsAmountPlaceholder(selectors.savingsGoalAmountInput, true);
+            selectors.savingsGoalNameInput.focus();
+        });
+        selectors.savingsUseMonthlyAllocation.addEventListener('change', (e) => {
+            updateSavingsAmountPlaceholder(selectors.savingsGoalAmountInput, e.target.checked);
+        });
+        document.addEventListener('change', (e) => {
+            if (e.target.classList.contains('edit-savings-allocation-toggle')) {
+                const limitInput = e.target.closest('.edit-category-form')?.querySelector('.edit-limit-input');
+                updateSavingsAmountPlaceholder(limitInput, e.target.checked);
+            }
+        });
+        selectors.saveSavingsGoalBtn.addEventListener('click', () => {
+            const name = selectors.savingsGoalNameInput.value.trim();
+            const limit = parseFloat(selectors.savingsGoalAmountInput.value);
+            const useMonthlyAllocation = selectors.savingsUseMonthlyAllocation.checked;
+            if (name && limit > 0) {
+                const newOrder = state.budgetedItems ? Object.keys(state.budgetedItems).length : 0;
+                push(ref(db, `budgets/${currentBudgetId}/budgetedItems`), {
+                    name, limit, savedBalance: 0, useMonthlyAllocation,
+                    expenses: {}, collapsed: true, isEditing: false, order: newOrder, type: 'savings'
+                });
+                selectors.savingsGoalNameInput.value = '';
+                selectors.savingsGoalAmountInput.value = '';
+                selectors.savingsUseMonthlyAllocation.checked = true;
+                updateSavingsAmountPlaceholder(selectors.savingsGoalAmountInput, true);
+                selectors.newSavingsGoalForm.style.display = 'none';
+            } else {
+                alert(`Please enter a valid goal name and ${useMonthlyAllocation ? 'monthly allocation' : 'goal'} amount.`);
+            }
+        });
         selectors.incomeExpensesSection.querySelector('.section-header').addEventListener('click', (e) => { if (!e.target.closest('.icon-btn')) { set(ref(db, `budgets/${currentBudgetId}/incomeSectionCollapsed`), !state.incomeSectionCollapsed); } });
         selectors.allocationSection.querySelector('.section-header').addEventListener('click', (e) => { if (!e.target.closest('.icon-btn')) { set(ref(db, `budgets/${currentBudgetId}/allocationSectionCollapsed`), !state.allocationSectionCollapsed); } });
         function toggleAllCategories(isCollapsed) { if (!state.budgetedItems) return; const updates = {}; Object.keys(state.budgetedItems).forEach(key => { if (state.budgetedItems[key].type !== 'savings') updates[`/budgetedItems/${key}/collapsed`] = isCollapsed; }); update(dbRef, updates); }
@@ -2147,6 +2268,10 @@
                         const updates = { name: newName, limit: newLimit, isEditing: false };
                         if(rolloverCheckbox) {
                             updates.rolloverEnabled = rolloverCheckbox.checked;
+                        }
+                        const savingsAllocationCheckbox = form.querySelector('.edit-savings-allocation-toggle');
+                        if (savingsAllocationCheckbox) {
+                            updates.useMonthlyAllocation = savingsAllocationCheckbox.checked;
                         }
                         update(ref(db, `budgets/${currentBudgetId}/budgetedItems/${key}`), updates); 
                     } else { 
