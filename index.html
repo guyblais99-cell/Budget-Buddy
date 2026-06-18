@@ -131,6 +131,9 @@
         #comparison-charts-area canvas { width: 100% !important; max-width: 100% !important; }
         #comparison-cashflow-chart { height: 360px !important; max-height: 360px; }
         #comparison-spending-chart { height: 400px !important; max-height: 400px; }
+        #comparison-category-filter { min-height: 120px; }
+        .comparison-filter-actions { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+        .comparison-filter-hint { font-size: 0.82em; color: #666; margin: 6px 0 0; }
         @media (max-width: 600px) { 
             #comparison-cashflow-chart { height: 420px !important; max-height: 420px; }
             #comparison-spending-chart { height: 350px !important; max-height: 350px; }
@@ -1104,6 +1107,25 @@
         }
         const calculateTotalBudgetedSpending = (data) => getItemsByType(data, 'budget').flatMap(cat => toArray(cat.expenses)).reduce((sum, exp) => sum + exp.amount, 0);
         const calculateTotalOutgoing = (data) => calculateTotalMonthlyExpenses(data) + calculateTotalBudgetedSpending(data);
+        const getSpendingByCategoryName = (month) => {
+            const acc = {};
+            toArray(month.budgetedItems || {}).forEach(cat => {
+                acc[cat.name] = toArray(cat.expenses).reduce((sum, exp) => sum + exp.amount, 0);
+            });
+            return acc;
+        };
+        const getComparisonCategoryList = (months) => {
+            const map = new Map();
+            months.forEach(month => {
+                toArray(month.budgetedItems || {}).forEach(cat => {
+                    if (!map.has(cat.name)) {
+                        map.set(cat.name, cat.type === 'savings' ? 'savings' : 'budget');
+                    }
+                });
+            });
+            return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+        };
+        const getAllComparisonCategoryNames = (months) => getComparisonCategoryList(months).map(([name]) => name);
         const getSavingsMonthActivity = (item) => toArray(item.expenses).reduce((sum, exp) => sum + exp.amount, 0);
         const getSavingsTotalBalance = (item) => (item.savedBalance || 0) + getSavingsMonthActivity(item);
         const calculateNetContributionsForAllocatedSavings = (data) => getItemsByType(data, 'savings').filter(savingsUsesMonthlyAllocation).reduce((sum, cat) => sum + getSavingsMonthActivity(cat), 0);
@@ -1428,13 +1450,28 @@
                 }
             }); 
         }
-        function createComparisonSpendingChart(months) { 
+        function createComparisonSpendingChart(months, categoryFilter = null) { 
             if(comparisonSpendingChart) comparisonSpendingChart.destroy(); 
-            const spendingByMonth = months.map((month) => getItemsByType(month, 'budget').reduce((acc, cat) => {
-                acc[cat.name] = toArray(cat.expenses).reduce((sum, exp) => sum + exp.amount, 0);
-                return acc;
-            }, {}));
-            const allCategoryNames = [...new Set(spendingByMonth.flatMap(spending => Object.keys(spending)))];
+            const spendingByMonth = months.map((month) => getSpendingByCategoryName(month));
+            let allCategoryNames = [...new Set(spendingByMonth.flatMap(spending => Object.keys(spending)))].sort((a, b) => a.localeCompare(b));
+            if (categoryFilter && categoryFilter.length > 0) {
+                allCategoryNames = allCategoryNames.filter(name => categoryFilter.includes(name));
+            }
+            const chartTitleEl = document.getElementById('comparison-spending-chart-title');
+            if (chartTitleEl) {
+                chartTitleEl.textContent = categoryFilter && categoryFilter.length > 0 && categoryFilter.length < getAllComparisonCategoryNames(months).length
+                    ? `Spending Comparison (${categoryFilter.length} selected)`
+                    : 'Spending Comparison';
+            }
+            if (allCategoryNames.length === 0) {
+                const ctx = document.getElementById('comparison-spending-chart').getContext('2d');
+                comparisonSpendingChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: { labels: ['No categories'], datasets: [] },
+                    options: { plugins: { legend: { display: false } } }
+                });
+                return;
+            }
             const datasets = months.map((month, index) => ({
                 label: formatYearMonth(month.monthYear),
                 data: allCategoryNames.map(name => spendingByMonth[index][name] || 0),
@@ -1907,17 +1944,60 @@
                         <select id="comparison-end-month" style="width:100%; padding:8px;"></select>
                     </div>
                 </div>
+                <div style="margin-bottom:12px;">
+                    <label for="comparison-category-filter" style="display:block; font-size:0.9em; margin-bottom:4px;">Categories to Compare</label>
+                    <select id="comparison-category-filter" multiple style="width:100%; padding:8px;"></select>
+                    <div class="comparison-filter-actions">
+                        <button type="button" id="comparison-show-all-categories" class="control-btn">Show All Categories</button>
+                    </div>
+                    <p class="comparison-filter-hint">Select specific categories to focus the spending chart, or use Show All Categories to reset. Hold Ctrl (Windows) or Cmd (Mac) to pick multiple. Includes spending categories and savings goals.</p>
+                </div>
                 <h3 id="comparison-range-title" style="margin: 0 0 10px 0;"></h3>
                 <div id="comparison-monthly-balance-list"></div>
                 <div class="chart-container">
                     <div><h3>Cash Flow Comparison</h3><canvas id="comparison-cashflow-chart"></canvas></div>
-                    <div><h3>Spending Comparison</h3><canvas id="comparison-spending-chart"></canvas></div>
+                    <div><h3 id="comparison-spending-chart-title">Spending Comparison</h3><canvas id="comparison-spending-chart"></canvas></div>
                 </div>`;
 
             const startSelect = document.getElementById('comparison-start-month');
             const endSelect = document.getElementById('comparison-end-month');
+            const categorySelect = document.getElementById('comparison-category-filter');
+            const showAllCategoriesBtn = document.getElementById('comparison-show-all-categories');
             const titleEl = document.getElementById('comparison-range-title');
             const comparisonMonthlyBalanceList = document.getElementById('comparison-monthly-balance-list');
+
+            const populateCategoryFilter = (months, preserveSelection = true) => {
+                const previousSelection = preserveSelection ? [...categorySelect.selectedOptions].map(o => o.value) : [];
+                const categories = getComparisonCategoryList(months);
+                categorySelect.innerHTML = '';
+                const budgetGroup = document.createElement('optgroup');
+                budgetGroup.label = 'Spending Categories';
+                const savingsGroup = document.createElement('optgroup');
+                savingsGroup.label = 'Savings Goals';
+                categories.forEach(([name, type]) => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    (type === 'savings' ? savingsGroup : budgetGroup).appendChild(option);
+                });
+                if (budgetGroup.children.length > 0) categorySelect.appendChild(budgetGroup);
+                if (savingsGroup.children.length > 0) categorySelect.appendChild(savingsGroup);
+
+                const allNames = categories.map(([name]) => name);
+                const namesToSelect = previousSelection.length > 0
+                    ? previousSelection.filter(name => allNames.includes(name))
+                    : allNames;
+                [...categorySelect.options].forEach(option => {
+                    option.selected = namesToSelect.includes(option.value);
+                });
+            };
+
+            const getActiveCategoryFilter = (months) => {
+                const allNames = getAllComparisonCategoryNames(months);
+                const selected = [...categorySelect.selectedOptions].map(o => o.value);
+                if (selected.length === 0 || selected.length === allNames.length) return null;
+                return selected;
+            };
 
             history.forEach((month, index) => {
                 const label = formatYearMonth(month.monthYear);
@@ -1935,6 +2015,8 @@
                 const rangeEnd = Math.max(startIdx, endIdx);
                 const monthsToCompare = history.slice(rangeStart, rangeEnd + 1);
 
+                populateCategoryFilter(monthsToCompare);
+
                 if (monthsToCompare.length < 2) {
                     titleEl.textContent = 'Select at least 2 months to compare';
                     comparisonMonthlyBalanceList.innerHTML = '';
@@ -1946,11 +2028,25 @@
                 titleEl.textContent = `${monthsToCompare.length} Month Comparison: Leftover / Over Budget`;
                 comparisonMonthlyBalanceList.innerHTML = renderComparisonMonthlyBalance(monthsToCompare);
                 createComparisonCashflowChart(monthsToCompare);
-                createComparisonSpendingChart(monthsToCompare);
+                createComparisonSpendingChart(monthsToCompare, getActiveCategoryFilter(monthsToCompare));
             };
 
             startSelect.addEventListener('change', renderSelectedRange);
             endSelect.addEventListener('change', renderSelectedRange);
+            categorySelect.addEventListener('change', () => {
+                const startIdx = parseInt(startSelect.value, 10);
+                const endIdx = parseInt(endSelect.value, 10);
+                const rangeStart = Math.min(startIdx, endIdx);
+                const rangeEnd = Math.max(startIdx, endIdx);
+                const monthsToCompare = history.slice(rangeStart, rangeEnd + 1);
+                if (monthsToCompare.length >= 2) {
+                    createComparisonSpendingChart(monthsToCompare, getActiveCategoryFilter(monthsToCompare));
+                }
+            });
+            showAllCategoriesBtn.addEventListener('click', () => {
+                [...categorySelect.options].forEach(option => { option.selected = true; });
+                categorySelect.dispatchEvent(new Event('change'));
+            });
             renderSelectedRange();
         }
 
