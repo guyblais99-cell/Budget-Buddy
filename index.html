@@ -1123,13 +1123,28 @@
             if (cat.type === 'savings') {
                 if (savingsUsesMonthlyAllocation(cat)) {
                     const remaining = cat.limit - activity;
-                    return { remaining, isLeftover: remaining >= 0, isSavings: true, usesAllocation: true };
+                    return {
+                        remaining,
+                        isLeftover: remaining >= 0,
+                        isSavings: true,
+                        usesAllocation: true,
+                        activity,
+                        budget: cat.limit,
+                        activityLabel: activity < 0 ? 'Net withdrawn' : 'Contributed'
+                    };
                 }
-                return { remaining: activity, isLeftover: activity >= 0, isSavings: true, usesAllocation: false, isNetActivity: true };
+                return { remaining: activity, isLeftover: activity >= 0, isSavings: true, usesAllocation: false, isNetActivity: true, activity };
             }
             const effectiveBudget = cat.limit + (cat.rolloverBalance || 0);
             const remaining = effectiveBudget - activity;
-            return { remaining, isLeftover: remaining >= 0, isSavings: false };
+            return {
+                remaining,
+                isLeftover: remaining >= 0,
+                isSavings: false,
+                activity,
+                budget: effectiveBudget,
+                activityLabel: 'Spent'
+            };
         };
         const getSavingsMonthActivity = (item) => toArray(item.expenses).reduce((sum, exp) => sum + exp.amount, 0);
         const getSavingsTotalBalance = (item) => (item.savedBalance || 0) + getSavingsMonthActivity(item);
@@ -1427,11 +1442,17 @@
                 }
                 if (balance.isNetActivity) {
                     const isPositive = balance.remaining >= 0;
+                    const activityLine = isPositive
+                        ? `Contributed: ${currencyFormatter.format(balance.activity)}`
+                        : `Withdrawn: ${currencyFormatter.format(Math.abs(balance.activity))}`;
                     return `<div class="monthly-balance-summary" style="margin-top: 8px;">
                                 <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
                                     <span><strong>${monthLabel}</strong></span>
-                                    <span class="${isPositive ? 'monthly-balance-positive' : 'monthly-balance-negative'}" style="font-weight: 700;">
-                                        ${currencyFormatter.format(Math.abs(balance.remaining))} ${isPositive ? 'net contributed' : 'net withdrawn'}
+                                    <span style="display:flex; flex-direction:column; align-items:flex-end; text-align:right;">
+                                        <span class="${isPositive ? 'monthly-balance-positive' : 'monthly-balance-negative'}" style="font-weight: 700;">
+                                            ${currencyFormatter.format(Math.abs(balance.remaining))} ${isPositive ? 'net contributed' : 'net withdrawn'}
+                                        </span>
+                                        <span class="monthly-balance-subtext">${activityLine}</span>
                                     </span>
                                 </div>
                             </div>`;
@@ -1439,11 +1460,20 @@
                 const overUnderLabel = balance.isLeftover
                     ? 'left over'
                     : (balance.isSavings ? 'over allocation' : 'over budget');
+                const activityAmount = balance.activityLabel === 'Net withdrawn'
+                    ? currencyFormatter.format(Math.abs(balance.activity))
+                    : currencyFormatter.format(Math.max(0, balance.activity));
+                const activityLine = balance.activityLabel === 'Net withdrawn'
+                    ? `${balance.activityLabel}: ${activityAmount}`
+                    : `${balance.activityLabel}: ${activityAmount} of ${currencyFormatter.format(balance.budget)}`;
                 return `<div class="monthly-balance-summary" style="margin-top: 8px;">
                             <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
                                 <span><strong>${monthLabel}</strong></span>
-                                <span class="${balance.isLeftover ? 'monthly-balance-positive' : 'monthly-balance-negative'}" style="font-weight: 700;">
-                                    ${currencyFormatter.format(Math.abs(balance.remaining))} ${overUnderLabel}
+                                <span style="display:flex; flex-direction:column; align-items:flex-end; text-align:right;">
+                                    <span class="${balance.isLeftover ? 'monthly-balance-positive' : 'monthly-balance-negative'}" style="font-weight: 700;">
+                                        ${currencyFormatter.format(Math.abs(balance.remaining))} ${overUnderLabel}
+                                    </span>
+                                    <span class="monthly-balance-subtext">${activityLine}</span>
                                 </span>
                             </div>
                         </div>`;
