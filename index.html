@@ -1148,9 +1148,9 @@
         };
         const getSavingsMonthActivity = (item) => toArray(item.expenses).reduce((sum, exp) => sum + exp.amount, 0);
         const getSavingsTotalBalance = (item) => (item.savedBalance || 0) + getSavingsMonthActivity(item);
-        const calculateNetContributionsForAllocatedSavings = (data) => getItemsByType(data, 'savings').filter(savingsUsesMonthlyAllocation).reduce((sum, cat) => sum + getSavingsMonthActivity(cat), 0);
+        const calculateUnspentSavingsAllocation = (data) => getItemsByType(data, 'savings').filter(savingsUsesMonthlyAllocation).reduce((sum, cat) => sum + Math.max(0, cat.limit - getSavingsMonthActivity(cat)), 0);
         const calculateMonthlyNet = (data) => calculateTotalSpendableInBudgets(data) - calculateTotalBudgetedSpending(data);
-        const calculateMonthlyNetIncludingSavings = (data) => calculateMonthlyNet(data) + calculateTotalAllocatedToSavings(data) - calculateNetContributionsForAllocatedSavings(data);
+        const calculateMonthlyNetIncludingSavings = (data) => calculateMonthlyNet(data) + calculateUnspentSavingsAllocation(data);
         const calculateSpentInCategory = (categoryKey) => toArray(state.budgetedItems?.[categoryKey]?.expenses).reduce((sum, exp) => sum + exp.amount, 0);
         function getColorForPercentage(percent) { percent = Math.max(0, Math.min(100, percent)); const startColor = { r: 46, g: 204, b: 113 }; const midColor = { r: 255, g: 193, b: 7 }; const r = Math.round(startColor.r + (midColor.r - startColor.r) * (1 - percent / 100)); const g = Math.round(startColor.g + (midColor.g - startColor.g) * (1 - percent / 100)); const b = Math.round(startColor.b + (midColor.b - startColor.b) * (1 - percent / 100)); return `rgb(${r}, ${g}, ${b})`; }
 
