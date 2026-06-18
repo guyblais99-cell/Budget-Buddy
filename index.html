@@ -1103,7 +1103,7 @@
             inputEl.placeholder = useMonthlyAllocation ? 'Monthly Allocation' : 'Goal Amount';
         }
         const calculateTotalBudgetedSpending = (data) => getItemsByType(data, 'budget').flatMap(cat => toArray(cat.expenses)).reduce((sum, exp) => sum + exp.amount, 0);
-        const calculateTotalContributions = (data) => getItemsByType(data, 'savings').flatMap(cat => toArray(cat.expenses)).reduce((sum, exp) => sum + exp.amount, 0);
+        const calculateTotalOutgoing = (data) => calculateTotalMonthlyExpenses(data) + calculateTotalBudgetedSpending(data);
         const getSavingsMonthActivity = (item) => toArray(item.expenses).reduce((sum, exp) => sum + exp.amount, 0);
         const getSavingsTotalBalance = (item) => (item.savedBalance || 0) + getSavingsMonthActivity(item);
         const calculateNetContributionsForAllocatedSavings = (data) => getItemsByType(data, 'savings').filter(savingsUsesMonthlyAllocation).reduce((sum, cat) => sum + getSavingsMonthActivity(cat), 0);
@@ -1320,7 +1320,7 @@
         }
         // --- END: MODIFIED FUNCTION ---
 
-        function createCashflowChart(monthData) { if(cashflowChartInstance) cashflowChartInstance.destroy(); const totalIncome = calculateTotalIncome(monthData); const totalSpending = calculateTotalMonthlyExpenses(monthData) + calculateTotalBudgetedSpending(monthData) + calculateTotalContributions(monthData); const ctx = document.getElementById('cashflow-chart').getContext('2d'); cashflowChartInstance = new Chart(ctx, { type: 'bar', data: { labels: ['Total Income', 'Total Outgoing'], datasets: [{ label: 'Amount', data: [totalIncome, totalSpending], backgroundColor: ['rgba(46, 204, 113, 0.7)', 'rgba(231, 76, 60, 0.7)'], borderColor: ['#2ecc71', '#e74c3c'], borderWidth: 1 }] }, options: { scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } } }); }
+        function createCashflowChart(monthData) { if(cashflowChartInstance) cashflowChartInstance.destroy(); const totalIncome = calculateTotalIncome(monthData); const totalSpending = calculateTotalOutgoing(monthData); const ctx = document.getElementById('cashflow-chart').getContext('2d'); cashflowChartInstance = new Chart(ctx, { type: 'bar', data: { labels: ['Total Income', 'Total Outgoing'], datasets: [{ label: 'Amount', data: [totalIncome, totalSpending], backgroundColor: ['rgba(46, 204, 113, 0.7)', 'rgba(231, 76, 60, 0.7)'], borderColor: ['#2ecc71', '#e74c3c'], borderWidth: 1 }] }, options: { scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } } }); }
         function createSpendingChart(monthData) {
             if (spendingChartInstance) spendingChartInstance.destroy();
             // build data for categories
@@ -1392,7 +1392,7 @@
             const ctx = document.getElementById('comparison-cashflow-chart').getContext('2d'); 
             const datasets = months.map((month, index) => {
                 const totalIncome = calculateTotalIncome(month);
-                const totalOutgoing = calculateTotalMonthlyExpenses(month) + calculateTotalBudgetedSpending(month) + calculateTotalContributions(month);
+                const totalOutgoing = calculateTotalOutgoing(month);
                 return {
                     label: formatYearMonth(month.monthYear),
                     data: [totalIncome, totalOutgoing],
