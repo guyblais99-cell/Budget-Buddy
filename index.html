@@ -1154,19 +1154,14 @@
         };
         const getSavingsMonthActivity = (item) => toArray(item.expenses).reduce((sum, exp) => sum + exp.amount, 0);
         const getSavingsTotalBalance = (item) => (item.savedBalance || 0) + getSavingsMonthActivity(item);
-        const calculateUnspentSavingsAllocation = (data) => getItemsByType(data, 'savings').filter(savingsUsesMonthlyAllocation).reduce((sum, cat) => sum + Math.max(0, cat.limit - getSavingsMonthActivity(cat)), 0);
         const calculateMonthlyNet = (data) => calculateTotalSpendableInBudgets(data) - calculateTotalBudgetedSpending(data);
-        const calculateMonthlyNetIncludingSavings = (data) => calculateMonthlyNet(data) + calculateUnspentSavingsAllocation(data);
-        const formatUnspentSavingsSubtext = (data) => {
-            const unspent = calculateUnspentSavingsAllocation(data);
-            if (unspent > 0) {
-                return `<br><span style="color:#666;">${currencyFormatter.format(unspent)} of savings allocation unused</span>`;
-            }
-            const hasAllocatedSavings = getItemsByType(data, 'savings').some(savingsUsesMonthlyAllocation);
-            if (hasAllocatedSavings) {
-                return `<br><span style="color:#666;">Savings allocation fully used</span>`;
-            }
-            return '';
+        const calculateMonthlyNetIncludingSavings = (data) => calculateMonthlyNet(data) + calculateTotalAllocatedToSavings(data);
+        const formatIncludingSavingsAmount = (data) => {
+            const total = calculateMonthlyNetIncludingSavings(data);
+            const allocated = calculateTotalAllocatedToSavings(data);
+            const isLeftover = total >= 0;
+            const allocatedNote = allocated > 0 ? ` (${currencyFormatter.format(allocated)} allocated)` : '';
+            return `${currencyFormatter.format(Math.abs(total))} ${isLeftover ? 'left over' : 'over total'}${allocatedNote}`;
         };
         const calculateSpentInCategory = (categoryKey) => toArray(state.budgetedItems?.[categoryKey]?.expenses).reduce((sum, exp) => sum + exp.amount, 0);
         function getColorForPercentage(percent) { percent = Math.max(0, Math.min(100, percent)); const startColor = { r: 46, g: 204, b: 113 }; const midColor = { r: 255, g: 193, b: 7 }; const r = Math.round(startColor.r + (midColor.r - startColor.r) * (1 - percent / 100)); const g = Math.round(startColor.g + (midColor.g - startColor.g) * (1 - percent / 100)); const b = Math.round(startColor.b + (midColor.b - startColor.b) * (1 - percent / 100)); return `rgb(${r}, ${g}, ${b})`; }
@@ -1422,7 +1417,7 @@
             const isLeftoverIncludingSavings = monthlyNetIncludingSavings >= 0;
             balanceEl.style.display = 'block';
             balanceEl.innerHTML = `Month Result: <strong class="${isLeftover ? 'monthly-balance-positive' : 'monthly-balance-negative'}">${currencyFormatter.format(Math.abs(monthlyNet))} ${isLeftover ? 'left over' : 'over budget'}</strong>
-                <div class="monthly-balance-subtext">Including allocated savings: <span class="${isLeftoverIncludingSavings ? 'monthly-balance-positive' : 'monthly-balance-negative'}">${currencyFormatter.format(Math.abs(monthlyNetIncludingSavings))} ${isLeftoverIncludingSavings ? 'left over' : 'over total'}</span>${formatUnspentSavingsSubtext(monthData)}</div>`;
+                <div class="monthly-balance-subtext">Including allocated savings: <span class="${isLeftoverIncludingSavings ? 'monthly-balance-positive' : 'monthly-balance-negative'}">${formatIncludingSavingsAmount(monthData)}</span></div>`;
         }
 
         function renderComparisonMonthlyBalance(months, categoryName = null) {
@@ -1439,7 +1434,7 @@
                                         <span class="${isLeftover ? 'monthly-balance-positive' : 'monthly-balance-negative'}" style="font-weight: 700;">
                                             ${currencyFormatter.format(Math.abs(monthlyNet))} ${isLeftover ? 'left over' : 'over budget'}
                                         </span>
-                                        <span class="monthly-balance-subtext">Including allocated savings: <span class="${isLeftoverIncludingSavings ? 'monthly-balance-positive' : 'monthly-balance-negative'}">${currencyFormatter.format(Math.abs(monthlyNetIncludingSavings))} ${isLeftoverIncludingSavings ? 'left over' : 'over total'}</span>${formatUnspentSavingsSubtext(month)}</span>
+                                        <span class="monthly-balance-subtext">Including allocated savings: <span class="${isLeftoverIncludingSavings ? 'monthly-balance-positive' : 'monthly-balance-negative'}">${formatIncludingSavingsAmount(month)}</span></span>
                                     </span>
                                 </div>
                             </div>`;
