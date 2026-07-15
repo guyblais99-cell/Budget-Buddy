@@ -876,17 +876,20 @@
         function toInputDate(dateStr) {
             if (!dateStr) return new Date().toISOString().split('T')[0];
             try {
+                const slashParts = parseSlashDateParts(dateStr);
+                if (slashParts) {
+                    const formattedDate = new Date(slashParts.year, slashParts.month - 1, slashParts.day);
+                    const m = String(formattedDate.getMonth() + 1).padStart(2, '0');
+                    const d = String(formattedDate.getDate()).padStart(2, '0');
+                    return `${formattedDate.getFullYear()}-${m}-${d}`;
+                }
                 const date = new Date(dateStr);
                 if (isNaN(date.getTime())) {
-                    const parts = dateStr.split('/');
-                    if (parts.length === 3) {
-                        const [month, day, year] = parts;
-                        const formattedDate = new Date(year, month - 1, day);
-                        return formattedDate.toISOString().split('T')[0];
-                    }
                     return new Date().toISOString().split('T')[0];
                 }
-                return date.toISOString().split('T')[0];
+                const m = String(date.getMonth() + 1).padStart(2, '0');
+                const d = String(date.getDate()).padStart(2, '0');
+                return `${date.getFullYear()}-${m}-${d}`;
             } catch (e) {
                 return new Date().toISOString().split('T')[0];
             }
@@ -1700,6 +1703,35 @@
             selectors.earnedTrophiesList.innerHTML = html;
         }
 
+        function parseSlashDateParts(dateStr) {
+            const slashMatch = String(dateStr).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+            if (!slashMatch) return null;
+            const a = Number(slashMatch[1]);
+            const b = Number(slashMatch[2]);
+            const year = Number(slashMatch[3]);
+            let day, month;
+
+            if (a > 12 && b <= 12) {
+                // Clearly D/M/Y (e.g. 30/06/2026)
+                day = a; month = b;
+            } else if (b > 12 && a <= 12) {
+                // Clearly M/D/Y (e.g. 6/30/2026)
+                month = a; day = b;
+            } else {
+                // Ambiguous (both <= 12) — match how the app stores dates via toLocaleDateString()
+                const sample = new Date(2020, 5, 30).toLocaleDateString(); // June 30
+                const dayFirst = sample.trim().startsWith('30');
+                if (dayFirst) {
+                    day = a; month = b;
+                } else {
+                    month = a; day = b;
+                }
+            }
+
+            if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+            return { year, month, day };
+        }
+
         function parseExpenseSortDate(dateStr) {
             if (!dateStr) return 0;
             if (typeof dateStr !== 'string') {
@@ -1714,12 +1746,9 @@
                 return new Date(Number(y), Number(m) - 1, Number(d)).getTime();
             }
 
-            // Locale-style from toLocaleDateString(): M/D/YYYY or MM/DD/YYYY
-            const slashMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-            if (slashMatch) {
-                const [, a, b, y] = slashMatch.map(Number);
-                // App stores dates via toLocaleDateString() (month/day/year for this app's users)
-                return new Date(y, a - 1, b).getTime();
+            const parts = parseSlashDateParts(dateStr);
+            if (parts) {
+                return new Date(parts.year, parts.month - 1, parts.day).getTime();
             }
 
             const parsed = new Date(dateStr);
