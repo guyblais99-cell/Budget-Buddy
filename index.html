@@ -336,7 +336,7 @@
             padding: 5px;
         }
         .quick-cat-btn {
-            padding: 15px 10px;
+            padding: 12px 10px;
             background-color: var(--secondary-bg);
             border: 2px solid var(--accent-color);
             color: var(--accent-color);
@@ -345,6 +345,23 @@
             cursor: pointer;
             transition: all 0.2s ease;
             font-size: 1em;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            line-height: 1.2;
+        }
+        .quick-cat-btn .quick-cat-remaining {
+            font-size: 0.78em;
+            font-weight: 600;
+            opacity: 0.85;
+        }
+        .quick-cat-btn .quick-cat-remaining.is-over {
+            color: var(--expense-color);
+        }
+        .quick-cat-btn:hover .quick-cat-remaining.is-over,
+        .quick-cat-btn:active .quick-cat-remaining.is-over {
+            color: #ffd7d4;
         }
         .quick-cat-btn:hover, .quick-cat-btn:active {
             background-color: var(--accent-color);
@@ -505,11 +522,17 @@
     <div class="modal-overlay" id="review-modal"><div class="modal-content"><div class="modal-header"><h2>Monthly Review</h2><button class="close-btn" id="close-review-modal-btn">&times;</button></div>
         <div id="review-content">
             <div id="review-tabs">
-                <button class="tab-btn active" data-tab="single-month-view">Single Month</button>
+                <button class="tab-btn active" data-tab="this-month-view">This Month</button>
+                <button class="tab-btn" data-tab="single-month-view">Past Months</button>
                 <button class="tab-btn" data-tab="compare-months-view">Compare Months</button>
             </div>
+
+            <div id="this-month-view" class="tab-content active">
+                <h3 style="margin: 0 0 12px 0;" id="this-month-title">This Month</h3>
+                <div id="this-month-purchases-list" style="max-height: 420px; overflow-y: auto; font-size: 0.9em;"></div>
+            </div>
             
-            <div id="single-month-view" class="tab-content active">
+            <div id="single-month-view" class="tab-content">
                 <div id="review-controls" style="width: 100%;"><label for="month-select">Select Month:</label><select id="month-select" style="padding: 8px; width: 100%;"></select></div>
                 <div id="single-month-balance" class="monthly-balance-summary" style="display: none;"></div>
                 <div id="no-history-msg" style="display: none; text-align: center; margin-top: 20px;"><p>No historical data for this budget yet.</p><button id="no-history-close-btn" style="margin-top: 15px;">Go Back</button></div>
@@ -709,6 +732,9 @@
             earnedTrophiesList: document.getElementById('earned-trophies-list'),
             toggleChallenges: document.getElementById('toggle-challenges'),
             reviewTabs: document.getElementById('review-tabs'),
+            thisMonthView: document.getElementById('this-month-view'),
+            thisMonthTitle: document.getElementById('this-month-title'),
+            thisMonthPurchasesList: document.getElementById('this-month-purchases-list'),
             singleMonthView: document.getElementById('single-month-view'),
             compareMonthsView: document.getElementById('compare-months-view'),
             noComparisonMsg: document.getElementById('no-comparison-msg'),
@@ -1623,6 +1649,57 @@
             selectors.earnedTrophiesList.innerHTML = html;
         }
 
+        function parseExpenseSortDate(dateStr) {
+            if (!dateStr) return 0;
+            const parsed = new Date(dateStr);
+            return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+        }
+
+        function renderThisMonthView() {
+            const listEl = selectors.thisMonthPurchasesList;
+            if (!listEl) return;
+
+            const monthLabel = formatYearMonth(state.monthYear || getCurrentYearMonth());
+            if (selectors.thisMonthTitle) {
+                selectors.thisMonthTitle.textContent = monthLabel;
+            }
+
+            const spendingCategories = Object.entries(state.budgetedItems || {})
+                .filter(([key, cat]) => (cat.type || 'budget') !== 'savings' && cat.expenses && Object.keys(cat.expenses).length > 0)
+                .map(([key, cat]) => {
+                    const expenses = Object.values(cat.expenses || {})
+                        .slice()
+                        .sort((a, b) => parseExpenseSortDate(b.date) - parseExpenseSortDate(a.date));
+                    const newest = expenses.length > 0 ? parseExpenseSortDate(expenses[0].date) : 0;
+                    const totalSpent = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+                    return { key, ...cat, expenses, newest, totalSpent };
+                })
+                .sort((a, b) => b.newest - a.newest);
+
+            if (spendingCategories.length === 0) {
+                listEl.innerHTML = `<p style="text-align:center; color:#666; margin-top:20px;">No purchases logged yet this month.</p>`;
+                return;
+            }
+
+            let html = '';
+            spendingCategories.forEach((cat) => {
+                html += `<div class="review-category-block" style="background:rgba(0,0,0,0.03); border:1px solid var(--border-color); border-radius:8px; padding:10px; margin-bottom:10px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px;">
+                        <div style="font-weight:700;">${cat.name}</div>
+                        <div style="text-align:right; font-size:0.95em; color:#333;">${currencyFormatter.format(cat.totalSpent)} spent</div>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:6px;">`;
+                cat.expenses.forEach(exp => {
+                    html += `<div style="display:flex; justify-content:space-between; padding:6px; background:rgba(255,255,255,0.7); border-radius:6px;">
+                        <div style="max-width:75%; word-break:break-word;"><strong>${currencyFormatter.format(exp.amount)}</strong> - <span style="color:#666; font-style:italic;">${exp.note || 'No note'}</span></div>
+                        <div style="color:#888; white-space:nowrap; margin-left:10px;">${exp.date || ''}</div>
+                    </div>`;
+                });
+                html += `</div></div>`;
+            });
+            listEl.innerHTML = html;
+        }
+
         function renderReviewRewards(monthData) {
             const rewardsSection = selectors.reviewRewardsSection;
             const rewardsList = selectors.reviewRewardsList;
@@ -1907,7 +1984,13 @@
                         .filter(([key, cat]) => cat.type !== 'savings');
                     contentHTML = `<div id="quick-add-amount-display">${currencyFormatter.format(quickAddState.amount)}</div><div class="quick-add-category-grid">`;
                     spendingCategories.forEach(([key, cat]) => {
-                        contentHTML += `<button class="quick-cat-btn" data-key="${key}">${cat.name}</button>`;
+                        const spent = toArray(cat.expenses).reduce((sum, exp) => sum + exp.amount, 0);
+                        const remaining = ((cat.limit || 0) + (cat.rolloverBalance || 0)) - spent;
+                        const remainingClass = remaining < 0 ? 'quick-cat-remaining is-over' : 'quick-cat-remaining';
+                        const remainingText = remaining < 0
+                            ? `${currencyFormatter.format(Math.abs(remaining))} over`
+                            : `${currencyFormatter.format(remaining)} left`;
+                        contentHTML += `<button class="quick-cat-btn" data-key="${key}"><span>${cat.name}</span><span class="${remainingClass}">${remainingText}</span></button>`;
                     });
                     contentHTML += `</div>`;
                     selectors.quickAddStepContent.innerHTML = contentHTML;
@@ -1991,7 +2074,9 @@
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             btn.classList.add('active');
             document.getElementById(tabId).classList.add('active');
-            if (tabId === 'compare-months-view') {
+            if (tabId === 'this-month-view') {
+                renderThisMonthView();
+            } else if (tabId === 'compare-months-view') {
                 renderComparisonView();
             }
         });
@@ -2275,6 +2360,15 @@
             selectors.reviewExpenseLogSection.style.display = 'none';
             selectors.singleMonthBalance.style.display = 'none';
             selectors.monthSelect.innerHTML = ''; 
+
+            // Always open on This Month (current live data)
+            selectors.reviewTabs.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            const thisMonthTab = selectors.reviewTabs.querySelector('[data-tab="this-month-view"]');
+            if (thisMonthTab) thisMonthTab.classList.add('active');
+            selectors.thisMonthView.classList.add('active');
+            renderThisMonthView();
+
             if (history.length === 0) { 
                 selectors.chartsArea.style.display = 'none'; 
                 selectors.reviewControls.style.display = 'none'; 
