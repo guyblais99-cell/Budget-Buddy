@@ -1702,6 +1702,26 @@
 
         function parseExpenseSortDate(dateStr) {
             if (!dateStr) return 0;
+            if (typeof dateStr !== 'string') {
+                const parsed = new Date(dateStr);
+                return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+            }
+
+            // ISO-style: YYYY-MM-DD
+            const isoMatch = dateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+            if (isoMatch) {
+                const [, y, m, d] = isoMatch;
+                return new Date(Number(y), Number(m) - 1, Number(d)).getTime();
+            }
+
+            // Locale-style from toLocaleDateString(): M/D/YYYY or MM/DD/YYYY
+            const slashMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+            if (slashMatch) {
+                const [, a, b, y] = slashMatch.map(Number);
+                // App stores dates via toLocaleDateString() (month/day/year for this app's users)
+                return new Date(y, a - 1, b).getTime();
+            }
+
             const parsed = new Date(dateStr);
             return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
         }
@@ -1718,18 +1738,23 @@
             const purchases = [];
             Object.entries(state.budgetedItems || {}).forEach(([key, cat]) => {
                 if ((cat.type || 'budget') === 'savings') return;
-                Object.values(cat.expenses || {}).forEach(exp => {
+                Object.entries(cat.expenses || {}).forEach(([expKey, exp]) => {
                     purchases.push({
                         categoryName: cat.name,
                         amount: exp.amount,
                         note: exp.note || '',
                         date: exp.date || '',
-                        sortDate: parseExpenseSortDate(exp.date)
+                        sortDate: parseExpenseSortDate(exp.date),
+                        expKey
                     });
                 });
             });
 
-            purchases.sort((a, b) => b.sortDate - a.sortDate);
+            // Newest date first; for same day, Firebase push keys are chronological so newer keys win
+            purchases.sort((a, b) => {
+                if (b.sortDate !== a.sortDate) return b.sortDate - a.sortDate;
+                return (b.expKey || '').localeCompare(a.expKey || '');
+            });
 
             if (purchases.length === 0) {
                 listEl.innerHTML = `<p style="text-align:center; color:#666; margin:40px 10px;">No purchases logged yet this month.</p>`;
