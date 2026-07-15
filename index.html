@@ -177,6 +177,56 @@
         .tab-btn.active { background-color: var(--secondary-bg); border: 1px solid var(--border-color); border-bottom: 1px solid var(--secondary-bg); margin-bottom: -1px; font-weight: bold; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
+        #this-month-view {
+            min-height: 480px;
+        }
+        #this-month-purchases-list {
+            max-height: 520px;
+            overflow-y: auto;
+            font-size: 0.9em;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: #fafcff;
+        }
+        .this-month-purchase-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .this-month-purchase-row:last-child {
+            border-bottom: none;
+        }
+        .this-month-purchase-row .purchase-main {
+            min-width: 0;
+            flex: 1;
+        }
+        .this-month-purchase-row .purchase-category {
+            font-weight: 700;
+            color: var(--text-color);
+        }
+        .this-month-purchase-row .purchase-note {
+            color: #666;
+            font-style: italic;
+            font-size: 0.92em;
+            margin-top: 2px;
+            word-break: break-word;
+        }
+        .this-month-purchase-row .purchase-meta {
+            text-align: right;
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+        .this-month-purchase-row .purchase-amount {
+            font-weight: 700;
+        }
+        .this-month-purchase-row .purchase-date {
+            color: #888;
+            font-size: 0.85em;
+            margin-top: 2px;
+        }
         .monthly-balance-summary {
             margin-top: 12px;
             padding: 12px;
@@ -529,7 +579,8 @@
 
             <div id="this-month-view" class="tab-content active">
                 <h3 style="margin: 0 0 12px 0;" id="this-month-title">This Month</h3>
-                <div id="this-month-purchases-list" style="max-height: 420px; overflow-y: auto; font-size: 0.9em;"></div>
+                <p style="font-size: 0.9em; color: #666; margin: 0 0 12px 0;">Most recent purchases across all categories</p>
+                <div id="this-month-purchases-list"></div>
             </div>
             
             <div id="single-month-view" class="tab-content">
@@ -1664,40 +1715,39 @@
                 selectors.thisMonthTitle.textContent = monthLabel;
             }
 
-            const spendingCategories = Object.entries(state.budgetedItems || {})
-                .filter(([key, cat]) => (cat.type || 'budget') !== 'savings' && cat.expenses && Object.keys(cat.expenses).length > 0)
-                .map(([key, cat]) => {
-                    const expenses = Object.values(cat.expenses || {})
-                        .slice()
-                        .sort((a, b) => parseExpenseSortDate(b.date) - parseExpenseSortDate(a.date));
-                    const newest = expenses.length > 0 ? parseExpenseSortDate(expenses[0].date) : 0;
-                    const totalSpent = expenses.reduce((sum, exp) => sum + exp.amount, 0);
-                    return { key, ...cat, expenses, newest, totalSpent };
-                })
-                .sort((a, b) => b.newest - a.newest);
+            const purchases = [];
+            Object.entries(state.budgetedItems || {}).forEach(([key, cat]) => {
+                if ((cat.type || 'budget') === 'savings') return;
+                Object.values(cat.expenses || {}).forEach(exp => {
+                    purchases.push({
+                        categoryName: cat.name,
+                        amount: exp.amount,
+                        note: exp.note || '',
+                        date: exp.date || '',
+                        sortDate: parseExpenseSortDate(exp.date)
+                    });
+                });
+            });
 
-            if (spendingCategories.length === 0) {
-                listEl.innerHTML = `<p style="text-align:center; color:#666; margin-top:20px;">No purchases logged yet this month.</p>`;
+            purchases.sort((a, b) => b.sortDate - a.sortDate);
+
+            if (purchases.length === 0) {
+                listEl.innerHTML = `<p style="text-align:center; color:#666; margin:40px 10px;">No purchases logged yet this month.</p>`;
                 return;
             }
 
-            let html = '';
-            spendingCategories.forEach((cat) => {
-                html += `<div class="review-category-block" style="background:rgba(0,0,0,0.03); border:1px solid var(--border-color); border-radius:8px; padding:10px; margin-bottom:10px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px;">
-                        <div style="font-weight:700;">${cat.name}</div>
-                        <div style="text-align:right; font-size:0.95em; color:#333;">${currencyFormatter.format(cat.totalSpent)} spent</div>
+            listEl.innerHTML = purchases.map(p => `
+                <div class="this-month-purchase-row">
+                    <div class="purchase-main">
+                        <div class="purchase-category">${p.categoryName}</div>
+                        <div class="purchase-note">${p.note || 'No note'}</div>
                     </div>
-                    <div style="display:flex; flex-direction:column; gap:6px;">`;
-                cat.expenses.forEach(exp => {
-                    html += `<div style="display:flex; justify-content:space-between; padding:6px; background:rgba(255,255,255,0.7); border-radius:6px;">
-                        <div style="max-width:75%; word-break:break-word;"><strong>${currencyFormatter.format(exp.amount)}</strong> - <span style="color:#666; font-style:italic;">${exp.note || 'No note'}</span></div>
-                        <div style="color:#888; white-space:nowrap; margin-left:10px;">${exp.date || ''}</div>
-                    </div>`;
-                });
-                html += `</div></div>`;
-            });
-            listEl.innerHTML = html;
+                    <div class="purchase-meta">
+                        <div class="purchase-amount">${currencyFormatter.format(p.amount)}</div>
+                        <div class="purchase-date">${p.date || ''}</div>
+                    </div>
+                </div>
+            `).join('');
         }
 
         function renderReviewRewards(monthData) {
