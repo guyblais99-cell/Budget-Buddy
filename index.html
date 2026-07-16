@@ -145,8 +145,9 @@
         .auth-form input { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px; }
         .auth-error { color: var(--expense-color); font-size: 0.9em; margin: 8px 0 0; min-height: 1.2em; }
         .auth-link-btn { background: none; border: none; color: var(--accent-color); cursor: pointer; padding: 0; text-align: left; font-size: 0.9em; text-decoration: underline; }
-        .user-budget-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px; margin-bottom: 8px; background: #fafafa; cursor: pointer; text-align: left; width: 100%; }
+        .user-budget-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px; margin-bottom: 8px; background: #fafafa; cursor: pointer; text-align: left; width: 100%; color: var(--text-color); font-weight: normal; }
         .user-budget-item:hover { background: #eaf2fa; border-color: var(--accent-color); }
+        .user-budget-item .budget-item-name { font-weight: 700; font-size: 1em; color: var(--text-color); }
         .account-status { font-size: 0.9em; color: #555; margin-bottom: 10px; }
         .account-status.linked { color: var(--income-color); font-weight: 600; }
         .app-content { display: none; }
@@ -620,7 +621,7 @@
                 <button type="button" id="create-new-budget-btn" style="width: 100%; margin-bottom: 12px;">Create a New Budget</button>
                 <hr>
                 <p style="margin: 12px 0 8px;"><strong>Join a Shared Budget</strong></p>
-                <p style="font-size: 0.9em; color: #555; margin: 0 0 8px;">Use a budget ID from someone who shared theirs with you.</p>
+                <p style="font-size: 0.9em; color: #555; margin: 0 0 8px;">Enter a budget ID from someone who shared theirs with you. It will be added to your list above so you can open it anytime.</p>
                 <div class="input-group">
                     <input type="text" id="join-budget-id-input" placeholder="Enter Budget ID">
                     <button type="button" id="join-budget-btn">Join</button>
@@ -1040,10 +1041,17 @@
                 selectors.userBudgetsList.innerHTML = '<p style="font-size:0.9em; color:#666; margin:0 0 12px;">No saved budgets yet. Create one or join with a budget ID.</p>';
                 return;
             }
-            selectors.userBudgetsList.innerHTML = `<p style="font-size:0.9em; color:#555; margin:0 0 8px;"><strong>Your Budgets</strong></p>` + entries.map(([budgetId, info]) => {
-                const label = info?.name || 'My Budget';
-                return `<button type="button" class="user-budget-item" data-budget-id="${budgetId}"><span>${label}</span><span style="color:#888; font-size:0.85em;">Open →</span></button>`;
-            }).join('');
+            const items = await Promise.all(entries.map(async ([budgetId, info]) => {
+                let label = info?.name || 'My Budget';
+                try {
+                    const snap = await get(ref(db, `budgets/${budgetId}/accountName`));
+                    if (snap.exists() && snap.val()) label = snap.val();
+                } catch (e) { /* use stored name */ }
+                return { budgetId, label };
+            }));
+            selectors.userBudgetsList.innerHTML = `<p style="font-size:0.9em; color:#555; margin:0 0 8px;"><strong>Your Budgets</strong></p>` + items.map(({ budgetId, label }) =>
+                `<button type="button" class="user-budget-item" data-budget-id="${budgetId}"><span class="budget-item-name">${label}</span><span style="color:#888; font-size:0.85em;">Open →</span></button>`
+            ).join('');
         }
 
         async function showBudgetPanel() {
@@ -2738,7 +2746,19 @@
             set(ref(db, `budgets/${currentBudgetId}/challengesEnabled`), e.target.checked); 
         });
 
-        selectors.saveAccountNameBtn.addEventListener('click', () => { const newName = selectors.editAccountNameInput.value.trim(); if (newName) { set(ref(db, `budgets/${currentBudgetId}/accountName`), newName); selectors.saveAccountNameBtn.textContent = 'Saved!'; setTimeout(() => { selectors.saveAccountNameBtn.textContent = 'Save'; closeModal(selectors.accountsModal); }, 1000); } else { alert('Please enter a valid budget name.'); } });
+        selectors.saveAccountNameBtn.addEventListener('click', async () => {
+            const newName = selectors.editAccountNameInput.value.trim();
+            if (newName) {
+                await set(ref(db, `budgets/${currentBudgetId}/accountName`), newName);
+                if (currentUser) {
+                    await linkBudgetToUser(currentBudgetId, newName);
+                }
+                selectors.saveAccountNameBtn.textContent = 'Saved!';
+                setTimeout(() => { selectors.saveAccountNameBtn.textContent = 'Save'; closeModal(selectors.accountsModal); }, 1000);
+            } else {
+                alert('Please enter a valid budget name.');
+            }
+        });
         selectors.copyIdBtn.addEventListener('click', () => { selectors.sharableIdDisplay.select(); document.execCommand('copy'); selectors.copyIdBtn.textContent = 'Copied!'; setTimeout(() => { selectors.copyIdBtn.textContent = 'Copy'; }, 1500); });
         selectors.leaveBudgetBtn.addEventListener('click', () => { localStorage.removeItem('lastBudgetId'); window.location.reload(); });
         
