@@ -598,22 +598,22 @@
                 </div>
 
                 <div id="auth-sign-in-panel" class="auth-form">
-                    <input type="email" id="sign-in-email" placeholder="Email" autocomplete="email">
-                    <input type="password" id="sign-in-password" placeholder="Password" autocomplete="current-password">
+                    <input type="email" id="sign-in-email" placeholder="Email" autocomplete="section-auth email">
+                    <input type="password" id="sign-in-password" placeholder="Password" autocomplete="section-auth current-password">
                     <button type="button" id="sign-in-btn" style="width: 100%;">Sign In</button>
                     <button type="button" class="auth-link-btn" id="show-reset-password-btn">Forgot password?</button>
                 </div>
 
                 <div id="auth-sign-up-panel" class="auth-form" style="display: none;">
-                    <input type="email" id="sign-up-email" placeholder="Email" autocomplete="email">
-                    <input type="password" id="sign-up-password" placeholder="Password (min 6 characters)" autocomplete="new-password">
-                    <input type="password" id="sign-up-password-confirm" placeholder="Confirm Password" autocomplete="new-password">
+                    <input type="email" id="sign-up-email" placeholder="Email" autocomplete="section-auth email">
+                    <input type="password" id="sign-up-password" placeholder="Password (min 6 characters)" autocomplete="section-auth new-password">
+                    <input type="password" id="sign-up-password-confirm" placeholder="Confirm Password" autocomplete="section-auth new-password">
                     <button type="button" id="sign-up-btn" style="width: 100%;">Create Account</button>
                 </div>
 
                 <div id="auth-reset-panel" class="auth-form" style="display: none;">
                     <p style="font-size: 0.9em; color: #555; margin: 0;">Enter your email and we'll send a password reset link.</p>
-                    <input type="email" id="reset-email" placeholder="Email" autocomplete="email">
+                    <input type="email" id="reset-email" placeholder="Email" autocomplete="section-auth email">
                     <button type="button" id="send-reset-btn" style="width: 100%;">Send Reset Link</button>
                     <button type="button" class="auth-link-btn" id="back-to-sign-in-btn">Back to Sign In</button>
                 </div>
@@ -1037,9 +1037,39 @@
             }
         }
 
+        function setOnboardingAuthFieldsActive(active) {
+            const fields = [
+                [selectors.signInEmail, 'section-auth email'],
+                [selectors.signInPassword, 'section-auth current-password'],
+                [selectors.signUpEmail, 'section-auth email'],
+                [selectors.signUpPassword, 'section-auth new-password'],
+                [selectors.signUpPasswordConfirm, 'section-auth new-password'],
+                [selectors.resetEmail, 'section-auth email'],
+            ];
+            fields.forEach(([el, autocomplete]) => {
+                if (!el) return;
+                el.disabled = !active;
+                el.autocomplete = active ? autocomplete : 'off';
+            });
+        }
+
+        function setSettingsAuthFieldsActive(active) {
+            const email = document.getElementById('settings-link-email');
+            const password = document.getElementById('settings-link-password');
+            if (email) {
+                email.disabled = !active;
+                email.autocomplete = active ? 'section-settings email' : 'off';
+            }
+            if (password) {
+                password.disabled = !active;
+                password.autocomplete = active ? 'section-settings current-password' : 'off';
+            }
+        }
+
         function showAuthPanel() {
             selectors.authPanel.style.display = 'block';
             selectors.budgetPanel.style.display = 'none';
+            setOnboardingAuthFieldsActive(true);
             setAuthError('');
             setAuthSuccess('');
         }
@@ -1115,6 +1145,7 @@
         async function showBudgetPanel() {
             selectors.authPanel.style.display = 'none';
             selectors.budgetPanel.style.display = 'block';
+            setOnboardingAuthFieldsActive(false);
             setAuthError('');
             if (currentUser) {
                 selectors.authWelcomeText.textContent = `Signed in as ${currentUser.email}`;
@@ -1154,8 +1185,8 @@
 
             section.innerHTML = `
                 <div class="auth-form" style="margin-bottom: 10px;">
-                    <input type="email" id="settings-link-email" placeholder="Email" autocomplete="email">
-                    <input type="password" id="settings-link-password" placeholder="Password" autocomplete="current-password">
+                    <input type="email" id="settings-link-email" placeholder="Email" autocomplete="section-settings email">
+                    <input type="password" id="settings-link-password" placeholder="Password" autocomplete="section-settings current-password">
                     <button type="button" id="settings-sign-in-link-btn" style="width:100%;">Sign In &amp; Link Budget</button>
                     <button type="button" id="settings-sign-up-link-btn" style="width:100%; background-color:#777;">Create Account &amp; Link Budget</button>
                     <button type="button" class="auth-link-btn" id="settings-forgot-password-btn">Forgot password?</button>
@@ -1242,7 +1273,9 @@
         function connectToBudget(budgetId) {
             currentBudgetId = budgetId;
             dbRef = ref(db, `budgets/${currentBudgetId}`);
-            isFirstLoad = true; 
+            isFirstLoad = true;
+            setOnboardingAuthFieldsActive(false);
+            setSettingsAuthFieldsActive(false); 
 
             onValue(dbRef, async (snapshot) => { 
                 const data = snapshot.val(); 
@@ -1754,7 +1787,7 @@
                 }
                 const expenseLogsHTML = item.expenses ? Object.entries(item.expenses).map(([expKey, exp]) => {
                     if (exp.isEditing) {
-                        return `<li class="edit-expense-form"><div class="input-group"><input type="number" class="edit-expense-amount-input" value="${exp.amount.toFixed(2)}"><input type="text" class="edit-expense-note-input" placeholder="Note" value="${exp.note || ''}"><input type="date" class="edit-expense-date-input" value="${toInputDate(exp.date)}"></div><div style="margin-top:5px; display:flex; gap:5px;"><button class="save-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">Save</button><button class="cancel-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}" style="background-color:#777">Cancel</button></div></li>`;
+                        return `<li class="edit-expense-form"><div class="input-group"><input type="number" class="edit-expense-amount-input" value="${exp.amount.toFixed(2)}" autocomplete="off" name="expense-amount"><input type="text" class="edit-expense-note-input" placeholder="Note" value="${exp.note || ''}" autocomplete="off" name="expense-note" data-1p-ignore data-lpignore="true"><input type="date" class="edit-expense-date-input" value="${toInputDate(exp.date)}" autocomplete="off"></div><div style="margin-top:5px; display:flex; gap:5px;"><button class="save-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}">Save</button><button class="cancel-edit-expense-btn" data-category-key="${key}" data-expense-key="${expKey}" style="background-color:#777">Cancel</button></div></li>`;
                     }
                     const isWithdrawal = isSavings && exp.amount < 0;
                     const isRefund = !isSavings && exp.amount < 0;
@@ -1765,7 +1798,7 @@
                 }).join('') : ''; 
                 const reorderControlsHTML = isSavings ? '' : `<span class="reorder-controls"><button class="move-btn move-up-btn" data-key="${key}" ${index === 0 ? 'disabled' : ''}>🔼</button><button class="move-btn move-down-btn" data-key="${key}" ${index === sortedItems.length - 1 ? 'disabled' : ''}>🔽</button></span>`; 
                 const buttonsHTML = isSavings ? `<div style="display: flex; flex-direction: column; gap: 8px; width: 100%;"><button class="add-expense-to-category-btn" style="flex: 1;">Add Contribution</button><button class="withdraw-from-goal-btn btn-red" type="button" style="flex: 1;">Withdraw</button></div>` : `<button class="add-expense-to-category-btn">Add Expense</button>`;
-                itemDiv.innerHTML = `<div class="budget-category-header" data-key="${key}"><span style="display: flex; align-items: center;">${challengeBadgeHTML}${reorderControlsHTML}${sinkingFundIcon}${savingsTypeIcon}${item.name}</span><div style="display: flex; align-items: center; gap: 5px;"><button class="icon-btn edit-btn" data-key="${key}">✏️</button><button class="icon-btn delete-btn" data-key="${key}" data-type="category">✖</button><span class="toggle-icon" style="margin-left: 15px;">▼</span></div></div>${editFormHTML}<div class="budget-summary-text">${summaryText}</div><div class="progress-bar"><div class="progress-bar-inner" style="width: ${progressPercent}%; background-color: ${barColor};"></div>${!isSavings ? `<div class="progress-bar-inner progress-bar-overspent" style="width: ${overspentPercent}%;"></div>` : ''}</div><div class="budget-category-content">${sinkingFundDetailsHTML}${lastMonthSpendingHTML}<div class="new-expense-form"><div class="input-group"><input type="number" placeholder="Amount" class="expense-amount-input" step="0.01"><input type="text" placeholder="Note (optional)" class="expense-note-input"></div>${buttonsHTML}</div><ul class="expense-log">${expenseLogsHTML}</ul></div>`;
+                itemDiv.innerHTML = `<div class="budget-category-header" data-key="${key}"><span style="display: flex; align-items: center;">${challengeBadgeHTML}${reorderControlsHTML}${sinkingFundIcon}${savingsTypeIcon}${item.name}</span><div style="display: flex; align-items: center; gap: 5px;"><button class="icon-btn edit-btn" data-key="${key}">✏️</button><button class="icon-btn delete-btn" data-key="${key}" data-type="category">✖</button><span class="toggle-icon" style="margin-left: 15px;">▼</span></div></div>${editFormHTML}<div class="budget-summary-text">${summaryText}</div><div class="progress-bar"><div class="progress-bar-inner" style="width: ${progressPercent}%; background-color: ${barColor};"></div>${!isSavings ? `<div class="progress-bar-inner progress-bar-overspent" style="width: ${overspentPercent}%;"></div>` : ''}</div><div class="budget-category-content">${sinkingFundDetailsHTML}${lastMonthSpendingHTML}<div class="new-expense-form"><div class="input-group"><input type="number" placeholder="Amount" class="expense-amount-input" step="0.01" autocomplete="off" inputmode="decimal" name="expense-amount"><input type="text" placeholder="Note (optional)" class="expense-note-input" autocomplete="off" name="expense-note" data-1p-ignore data-lpignore="true"></div>${buttonsHTML}</div><ul class="expense-log">${expenseLogsHTML}</ul></div>`;
                 parentList.appendChild(itemDiv); 
             }); 
         }
@@ -2434,7 +2467,7 @@
                     selectors.quickAddTitle.textContent = "Add Note (Optional)";
                     const categoryName = state.budgetedItems[quickAddState.categoryKey].name;
                      contentHTML = `<div style="margin-bottom: 15px; font-size: 1.1em;"><strong>${currencyFormatter.format(quickAddState.amount)}</strong> for <strong>${categoryName}</strong></div>
-                     <div class="input-group"><input type="text" id="qa-note-input" placeholder="e.g., Lunch, Coffee..." style="font-size: 1.2em; padding: 15px;"></div>
+                     <div class="input-group"><input type="text" id="qa-note-input" placeholder="e.g., Lunch, Coffee..." style="font-size: 1.2em; padding: 15px;" autocomplete="off" name="expense-note" data-1p-ignore data-lpignore="true"></div>
                      <button id="qa-save-btn" style="width: 100%; margin-top: 15px; padding: 15px; font-size: 1.2em; background-color: var(--income-color);">Save ✅</button>`;
                     selectors.quickAddStepContent.innerHTML = contentHTML;
                     setTimeout(() => document.getElementById('qa-note-input').focus(), 100);
@@ -2818,6 +2851,7 @@
             selectors.editAccountNameInput.value = state.accountName || ''; 
             selectors.toggleChallenges.checked = state.challengesEnabled !== false;
             renderAccountSection();
+            setSettingsAuthFieldsActive(!currentUser);
             selectors.accountsModal.style.display = 'flex'; 
         });
         selectors.toggleChallenges.addEventListener('change', (e) => { 
@@ -2840,7 +2874,10 @@
         selectors.copyIdBtn.addEventListener('click', () => { selectors.sharableIdDisplay.select(); document.execCommand('copy'); selectors.copyIdBtn.textContent = 'Copied!'; setTimeout(() => { selectors.copyIdBtn.textContent = 'Copy'; }, 1500); });
         selectors.leaveBudgetBtn.addEventListener('click', () => { localStorage.removeItem('lastBudgetId'); window.location.reload(); });
         
-        const closeModal = (modal) => modal.style.display = 'none';
+        const closeModal = (modal) => {
+            modal.style.display = 'none';
+            if (modal === selectors.accountsModal) setSettingsAuthFieldsActive(false);
+        };
         selectors.closeReviewModalBtn.addEventListener('click', () => closeModal(selectors.reviewModal));
         selectors.closeAccountsModalBtn.addEventListener('click', () => closeModal(selectors.accountsModal));
         selectors.closeChallengeModalBtn.addEventListener('click', () => closeModal(selectors.challengeModal));
