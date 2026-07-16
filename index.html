@@ -150,6 +150,10 @@
         .user-budget-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px; margin-bottom: 8px; background: #fafafa; cursor: pointer; text-align: left; width: 100%; color: var(--text-color); font-weight: normal; }
         .user-budget-item:hover { background: #eaf2fa; border-color: var(--accent-color); }
         .user-budget-item .budget-item-name { font-weight: 700; font-size: 1em; color: var(--text-color); }
+        .user-budget-row { display: flex; gap: 8px; align-items: stretch; margin-bottom: 8px; }
+        .user-budget-row .user-budget-item { margin-bottom: 0; flex: 1; }
+        .user-budget-remove-btn { flex-shrink: 0; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 5px; background: #fff; color: var(--expense-color); cursor: pointer; font-size: 0.85em; font-weight: 600; }
+        .user-budget-remove-btn:hover { background: #fbe9e7; border-color: var(--expense-color); }
         .account-status { font-size: 0.9em; color: #555; margin-bottom: 10px; }
         .account-status.linked { color: var(--income-color); font-weight: 600; }
         .app-content { display: none; }
@@ -1067,10 +1071,19 @@
             return snapshot.val() || {};
         }
 
+        async function unlinkBudgetFromUser(budgetId) {
+            if (!currentUser) return;
+            await remove(ref(db, `users/${currentUser.uid}/budgets/${budgetId}`));
+        }
+
         async function isBudgetLinkedToUser(budgetId) {
             if (!currentUser) return false;
             const snapshot = await get(ref(db, `users/${currentUser.uid}/budgets/${budgetId}`));
             return snapshot.exists();
+        }
+
+        function escapeHtml(str) {
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
         async function renderUserBudgetList() {
@@ -1088,8 +1101,14 @@
                 } catch (e) { /* use stored name */ }
                 return { budgetId, label };
             }));
-            selectors.userBudgetsList.innerHTML = `<p style="font-size:0.9em; color:#555; margin:0 0 8px;"><strong>Your Budgets</strong></p>` + items.map(({ budgetId, label }) =>
-                `<button type="button" class="user-budget-item" data-budget-id="${budgetId}"><span class="budget-item-name">${label}</span><span style="color:#888; font-size:0.85em;">Open →</span></button>`
+            selectors.userBudgetsList.innerHTML = `<p style="font-size:0.9em; color:#555; margin:0 0 8px;"><strong>Your Budgets</strong></p><p style="font-size:0.82em; color:#666; margin:0 0 10px;">Remove only hides a budget from your list — it is not deleted. You can re-join with the ID anytime.</p>` + items.map(({ budgetId, label }) =>
+                `<div class="user-budget-row">
+                    <button type="button" class="user-budget-item" data-budget-id="${budgetId}">
+                        <span class="budget-item-name">${escapeHtml(label)}</span>
+                        <span style="color:#888; font-size:0.85em;">Open →</span>
+                    </button>
+                    <button type="button" class="user-budget-remove-btn" data-budget-id="${budgetId}" data-budget-name="${escapeHtml(label)}" title="Remove from my list">Remove</button>
+                </div>`
             ).join('');
         }
 
@@ -2510,6 +2529,19 @@
         });
 
         selectors.userBudgetsList.addEventListener('click', async (e) => {
+            const removeBtn = e.target.closest('.user-budget-remove-btn');
+            if (removeBtn) {
+                const budgetId = removeBtn.dataset.budgetId;
+                const budgetName = removeBtn.dataset.budgetName || 'this budget';
+                if (!await showConfirm(`Remove "${budgetName}" from your budget list?\n\nThis won't delete the budget — you can re-join later with the ID.`)) return;
+                await unlinkBudgetFromUser(budgetId);
+                if (localStorage.getItem('lastBudgetId') === budgetId) {
+                    localStorage.removeItem('lastBudgetId');
+                }
+                await renderUserBudgetList();
+                return;
+            }
+
             const item = e.target.closest('.user-budget-item');
             if (!item) return;
             const budgetId = item.dataset.budgetId;
@@ -2518,6 +2550,7 @@
                 connectToBudget(budgetId);
             } else {
                 alert('That budget could not be found. It may have been deleted.');
+                await unlinkBudgetFromUser(budgetId);
                 await renderUserBudgetList();
             }
         });
