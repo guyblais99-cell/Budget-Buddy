@@ -136,7 +136,19 @@
             #comparison-spending-chart { height: 350px !important; max-height: 350px; }
         }
         .confirm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-        #onboarding-modal { display: flex; }
+        #onboarding-modal { display: none; }
+        #onboarding-modal .modal-content { text-align: left; }
+        .auth-tabs { display: flex; gap: 8px; margin-bottom: 15px; }
+        .auth-tab { flex: 1; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px; background: #f0f0f0; color: var(--text-color); cursor: pointer; font-weight: 600; }
+        .auth-tab.active { background: var(--accent-color); color: white; border-color: var(--accent-color); }
+        .auth-form { display: flex; flex-direction: column; gap: 10px; }
+        .auth-form input { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px; }
+        .auth-error { color: var(--expense-color); font-size: 0.9em; margin: 8px 0 0; min-height: 1.2em; }
+        .auth-link-btn { background: none; border: none; color: var(--accent-color); cursor: pointer; padding: 0; text-align: left; font-size: 0.9em; text-decoration: underline; }
+        .user-budget-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px; margin-bottom: 8px; background: #fafafa; cursor: pointer; text-align: left; width: 100%; }
+        .user-budget-item:hover { background: #eaf2fa; border-color: var(--accent-color); }
+        .account-status { font-size: 0.9em; color: #555; margin-bottom: 10px; }
+        .account-status.linked { color: var(--income-color); font-weight: 600; }
         .app-content { display: none; }
         
         .reorder-controls { display: none; align-items: center; margin-right: 10px; gap: 5px; }
@@ -568,7 +580,55 @@
         </div>
     </div>
 
-    <div class="modal-overlay" id="onboarding-modal"><div class="modal-content"><div class="modal-header"><h2>Welcome to Budgety Buddy</h2></div><p>Create a new budget to share, or join one using an ID from a friend.</p><button id="create-new-budget-btn" style="width: 100%; margin-bottom: 15px;">Create a New Shared Budget</button><hr><p style="margin-top: 15px;"><strong>Or Join Existing Budget</strong></p><div class="input-group"><input type="text" id="join-budget-id-input" placeholder="Enter Sharable ID"><button id="join-budget-btn">Join</button></div></div></div>
+    <div class="modal-overlay" id="onboarding-modal">
+        <div class="modal-content" style="text-align: left;">
+            <div class="modal-header"><h2>Welcome to Budgety Buddy</h2></div>
+
+            <div id="auth-panel">
+                <div class="auth-tabs">
+                    <button type="button" class="auth-tab active" data-auth-tab="sign-in">Sign In</button>
+                    <button type="button" class="auth-tab" data-auth-tab="sign-up">Sign Up</button>
+                </div>
+
+                <div id="auth-sign-in-panel" class="auth-form">
+                    <input type="email" id="sign-in-email" placeholder="Email" autocomplete="email">
+                    <input type="password" id="sign-in-password" placeholder="Password" autocomplete="current-password">
+                    <button type="button" id="sign-in-btn" style="width: 100%;">Sign In</button>
+                    <button type="button" class="auth-link-btn" id="show-reset-password-btn">Forgot password?</button>
+                </div>
+
+                <div id="auth-sign-up-panel" class="auth-form" style="display: none;">
+                    <input type="email" id="sign-up-email" placeholder="Email" autocomplete="email">
+                    <input type="password" id="sign-up-password" placeholder="Password (min 6 characters)" autocomplete="new-password">
+                    <input type="password" id="sign-up-password-confirm" placeholder="Confirm Password" autocomplete="new-password">
+                    <button type="button" id="sign-up-btn" style="width: 100%;">Create Account</button>
+                </div>
+
+                <div id="auth-reset-panel" class="auth-form" style="display: none;">
+                    <p style="font-size: 0.9em; color: #555; margin: 0;">Enter your email and we'll send a password reset link.</p>
+                    <input type="email" id="reset-email" placeholder="Email" autocomplete="email">
+                    <button type="button" id="send-reset-btn" style="width: 100%;">Send Reset Link</button>
+                    <button type="button" class="auth-link-btn" id="back-to-sign-in-btn">Back to Sign In</button>
+                </div>
+
+                <p id="auth-error" class="auth-error"></p>
+            </div>
+
+            <div id="budget-panel" style="display: none;">
+                <p id="auth-welcome-text" style="margin: 0 0 12px 0; color: #555;"></p>
+                <div id="user-budgets-list"></div>
+                <button type="button" id="create-new-budget-btn" style="width: 100%; margin-bottom: 12px;">Create a New Budget</button>
+                <hr>
+                <p style="margin: 12px 0 8px;"><strong>Join a Shared Budget</strong></p>
+                <p style="font-size: 0.9em; color: #555; margin: 0 0 8px;">Use a budget ID from someone who shared theirs with you.</p>
+                <div class="input-group">
+                    <input type="text" id="join-budget-id-input" placeholder="Enter Budget ID">
+                    <button type="button" id="join-budget-btn">Join</button>
+                </div>
+                <button type="button" id="sign-out-btn" style="width: 100%; margin-top: 15px; background-color: #777;">Sign Out</button>
+            </div>
+        </div>
+    </div>
     <div class="modal-overlay" id="review-modal"><div class="modal-content"><div class="modal-header"><h2>Monthly Review</h2><button class="close-btn" id="close-review-modal-btn">&times;</button></div>
         <div id="review-content">
             <div id="review-tabs">
@@ -598,7 +658,7 @@
             </div>
         </div>
     </div></div>
-    <div class="modal-overlay" id="accounts-modal"><div class="modal-content"><div class="modal-header"><h2>Budget Settings & Sharing</h2><button class="close-btn" id="close-accounts-modal-btn">&times;</button></div><div id="accounts-content"><h3>Edit Budget Name</h3><div class="input-group"><input type="text" id="edit-account-name-input" placeholder="Budget Name"><button id="save-account-name-btn">Save</button></div><hr><h3>Your Sharable Budget ID</h3><p style="font-size: 0.9em; color: #555;">Give this ID to others so they can join and edit this budget in real-time.</p><div class="input-group"><input type="text" id="sharable-id-display" readonly style="background-color: #f0f0f0; font-weight: bold;"><button id="copy-id-btn">Copy</button></div><hr><h3>Features</h3>
+    <div class="modal-overlay" id="accounts-modal"><div class="modal-content"><div class="modal-header"><h2>Budget Settings & Sharing</h2><button class="close-btn" id="close-accounts-modal-btn">&times;</button></div><div id="accounts-content"><h3>Edit Budget Name</h3><div class="input-group"><input type="text" id="edit-account-name-input" placeholder="Budget Name"><button id="save-account-name-btn">Save</button></div><hr><h3>Your Sharable Budget ID</h3><p style="font-size: 0.9em; color: #555;">Give this ID to others so they can join and edit this budget in real-time.</p><div class="input-group"><input type="text" id="sharable-id-display" readonly style="background-color: #f0f0f0; font-weight: bold;"><button id="copy-id-btn">Copy</button></div><hr><h3>Account</h3><p style="font-size: 0.9em; color: #555;">Sign in to save your budget to your email so you can access it from any device.</p><div id="account-section"></div><hr><h3>Features</h3>
         <div class="setting-toggle">
             <label for="toggle-challenges">Enable Challenge Center
                 <span class="tooltip-container">
@@ -715,13 +775,16 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getDatabase, ref, set, onValue, push, remove, update, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
         const firebaseConfig = { apiKey: "AIzaSyAyPf2h3NhhHa1HqyHGkp7kvID72iVM0q8", authDomain: "simple-budget-43c48.firebaseapp.com", databaseURL: "https://simple-budget-43c48-default-rtdb.firebaseio.com", projectId: "simple-budget-43c48", storageBucket: "simple-budget-43c48.firebasestorage.app", messagingSenderId: "227409147398", appId: "1:227409147398:web:5cc2085c35021220daf587", measurementId: "G-MNJNXG67ST" };
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
+        const auth = getAuth(app);
 
         let state = {}; 
         let currentBudgetId = null;
+        let currentUser = null;
         let dbRef = null;
         let history = [];
     let cashflowChartInstance, spendingChartInstance, comparisonCashflowChart, comparisonSpendingChart;
@@ -764,6 +827,12 @@
             editAccountNameInput: document.getElementById('edit-account-name-input'), saveAccountNameBtn: document.getElementById('save-account-name-btn'),
             confirmModal: document.getElementById('confirm-modal'), confirmMsg: document.getElementById('confirm-msg'), confirmOkBtn: document.getElementById('confirm-ok-btn'), confirmCancelBtn: document.getElementById('confirm-cancel-btn'),
             onboardingModal: document.getElementById('onboarding-modal'), createNewBudgetBtn: document.getElementById('create-new-budget-btn'), joinBudgetBtn: document.getElementById('join-budget-btn'), joinBudgetIdInput: document.getElementById('join-budget-id-input'),
+            authPanel: document.getElementById('auth-panel'), budgetPanel: document.getElementById('budget-panel'), authWelcomeText: document.getElementById('auth-welcome-text'), userBudgetsList: document.getElementById('user-budgets-list'),
+            signInEmail: document.getElementById('sign-in-email'), signInPassword: document.getElementById('sign-in-password'), signInBtn: document.getElementById('sign-in-btn'),
+            signUpEmail: document.getElementById('sign-up-email'), signUpPassword: document.getElementById('sign-up-password'), signUpPasswordConfirm: document.getElementById('sign-up-password-confirm'), signUpBtn: document.getElementById('sign-up-btn'),
+            resetEmail: document.getElementById('reset-email'), sendResetBtn: document.getElementById('send-reset-btn'), showResetPasswordBtn: document.getElementById('show-reset-password-btn'), backToSignInBtn: document.getElementById('back-to-sign-in-btn'),
+            authSignInPanel: document.getElementById('auth-sign-in-panel'), authSignUpPanel: document.getElementById('auth-sign-up-panel'), authResetPanel: document.getElementById('auth-reset-panel'), authError: document.getElementById('auth-error'), signOutBtn: document.getElementById('sign-out-btn'),
+            accountSection: document.getElementById('account-section'),
             totalToBudget: document.getElementById('total-to-budget'), allocatedInBudgets: document.getElementById('allocated-in-budgets'), allocatedToSavings: document.getElementById('allocated-to-savings'), remainingToAllocate: document.getElementById('remaining-to-allocate'), 
             allocationProgressBar: document.getElementById('allocation-progress-bar'),
             allocationOverspentBar: document.getElementById('allocation-overspent-bar'),
@@ -912,8 +981,190 @@
             }; 
         }
 
-        function startNewBudget() { const newBudgetRef = push(ref(db, 'budgets')); const newBudgetId = newBudgetRef.key; set(newBudgetRef, createNewBudget()); connectToBudget(newBudgetId); }
-        async function joinBudget() { const budgetId = selectors.joinBudgetIdInput.value.trim(); if (!budgetId) { alert('Please enter a budget ID.'); return; } const budgetRef = ref(db, `budgets/${budgetId}`); const snapshot = await get(budgetRef); if (snapshot.exists()) { connectToBudget(budgetId); } else { alert('Budget ID not found. Please check the ID and try again.'); } }
+        function getAuthErrorMessage(error) {
+            const code = error?.code || '';
+            if (code === 'auth/email-already-in-use') return 'That email is already registered. Try signing in instead.';
+            if (code === 'auth/invalid-email') return 'Please enter a valid email address.';
+            if (code === 'auth/weak-password') return 'Password must be at least 6 characters.';
+            if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') return 'Incorrect email or password.';
+            if (code === 'auth/too-many-requests') return 'Too many attempts. Please wait a moment and try again.';
+            return error?.message || 'Something went wrong. Please try again.';
+        }
+
+        function setAuthError(message) {
+            if (selectors.authError) selectors.authError.textContent = message || '';
+        }
+
+        function showAuthPanel() {
+            selectors.authPanel.style.display = 'block';
+            selectors.budgetPanel.style.display = 'none';
+            setAuthError('');
+        }
+
+        function showAuthTab(tabName) {
+            selectors.authSignInPanel.style.display = tabName === 'sign-in' ? 'flex' : 'none';
+            selectors.authSignUpPanel.style.display = tabName === 'sign-up' ? 'flex' : 'none';
+            selectors.authResetPanel.style.display = tabName === 'reset' ? 'flex' : 'none';
+            document.querySelectorAll('.auth-tab').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.authTab === tabName);
+            });
+            setAuthError('');
+        }
+
+        async function linkBudgetToUser(budgetId, budgetName) {
+            if (!currentUser) return false;
+            await set(ref(db, `users/${currentUser.uid}/budgets/${budgetId}`), {
+                name: budgetName || 'My Budget',
+                linkedAt: new Date().toISOString()
+            });
+            await set(ref(db, `users/${currentUser.uid}/email`), currentUser.email || '');
+            return true;
+        }
+
+        async function getUserBudgets() {
+            if (!currentUser) return {};
+            const snapshot = await get(ref(db, `users/${currentUser.uid}/budgets`));
+            return snapshot.val() || {};
+        }
+
+        async function isBudgetLinkedToUser(budgetId) {
+            if (!currentUser) return false;
+            const snapshot = await get(ref(db, `users/${currentUser.uid}/budgets/${budgetId}`));
+            return snapshot.exists();
+        }
+
+        async function renderUserBudgetList() {
+            const budgets = await getUserBudgets();
+            const entries = Object.entries(budgets);
+            if (entries.length === 0) {
+                selectors.userBudgetsList.innerHTML = '<p style="font-size:0.9em; color:#666; margin:0 0 12px;">No saved budgets yet. Create one or join with a budget ID.</p>';
+                return;
+            }
+            selectors.userBudgetsList.innerHTML = `<p style="font-size:0.9em; color:#555; margin:0 0 8px;"><strong>Your Budgets</strong></p>` + entries.map(([budgetId, info]) => {
+                const label = info?.name || 'My Budget';
+                return `<button type="button" class="user-budget-item" data-budget-id="${budgetId}"><span>${label}</span><span style="color:#888; font-size:0.85em;">Open →</span></button>`;
+            }).join('');
+        }
+
+        async function showBudgetPanel() {
+            selectors.authPanel.style.display = 'none';
+            selectors.budgetPanel.style.display = 'block';
+            setAuthError('');
+            if (currentUser) {
+                selectors.authWelcomeText.textContent = `Signed in as ${currentUser.email}`;
+            }
+            await renderUserBudgetList();
+        }
+
+        async function renderAccountSection() {
+            const section = selectors.accountSection;
+            if (!section) return;
+
+            if (currentUser) {
+                const linked = currentBudgetId ? await isBudgetLinkedToUser(currentBudgetId) : false;
+                section.innerHTML = `
+                    <p class="account-status">Signed in as <strong>${currentUser.email}</strong></p>
+                    ${linked
+                        ? '<p class="account-status linked">✓ This budget is linked to your account</p>'
+                        : `<button type="button" id="link-budget-btn" style="width:100%; margin-bottom:8px;">Link This Budget to My Account</button>`}
+                    <button type="button" id="settings-sign-out-btn" style="width:100%; background-color:#777;">Sign Out</button>`;
+                const linkBtn = document.getElementById('link-budget-btn');
+                if (linkBtn) {
+                    linkBtn.addEventListener('click', async () => {
+                        if (!currentBudgetId) return;
+                        await linkBudgetToUser(currentBudgetId, state.accountName || 'My Budget');
+                        renderAccountSection();
+                        alert('Budget linked to your account!');
+                    });
+                }
+                document.getElementById('settings-sign-out-btn')?.addEventListener('click', async () => {
+                    if (await showConfirm('Sign out? Your budget will stay on this device until you leave it.')) {
+                        await signOut(auth);
+                        closeModal(selectors.accountsModal);
+                    }
+                });
+                return;
+            }
+
+            section.innerHTML = `
+                <div class="auth-form" style="margin-bottom: 10px;">
+                    <input type="email" id="settings-link-email" placeholder="Email" autocomplete="email">
+                    <input type="password" id="settings-link-password" placeholder="Password" autocomplete="current-password">
+                    <button type="button" id="settings-sign-in-link-btn" style="width:100%;">Sign In &amp; Link Budget</button>
+                    <button type="button" id="settings-sign-up-link-btn" style="width:100%; background-color:#777;">Create Account &amp; Link Budget</button>
+                    <button type="button" class="auth-link-btn" id="settings-forgot-password-btn">Forgot password?</button>
+                </div>`;
+
+            document.getElementById('settings-sign-in-link-btn')?.addEventListener('click', async () => {
+                const email = document.getElementById('settings-link-email').value.trim();
+                const password = document.getElementById('settings-link-password').value;
+                if (!email || !password) { alert('Please enter your email and password.'); return; }
+                try {
+                    await signInWithEmailAndPassword(auth, email, password);
+                    if (currentBudgetId) {
+                        await linkBudgetToUser(currentBudgetId, state.accountName || 'My Budget');
+                        alert('Signed in and budget linked to your account!');
+                    }
+                    renderAccountSection();
+                } catch (error) {
+                    alert(getAuthErrorMessage(error));
+                }
+            });
+
+            document.getElementById('settings-sign-up-link-btn')?.addEventListener('click', async () => {
+                const email = document.getElementById('settings-link-email').value.trim();
+                const password = document.getElementById('settings-link-password').value;
+                if (!email || !password) { alert('Please enter an email and password.'); return; }
+                if (password.length < 6) { alert('Password must be at least 6 characters.'); return; }
+                try {
+                    await createUserWithEmailAndPassword(auth, email, password);
+                    if (currentBudgetId) {
+                        await linkBudgetToUser(currentBudgetId, state.accountName || 'My Budget');
+                        alert('Account created and budget linked!');
+                    }
+                    renderAccountSection();
+                } catch (error) {
+                    alert(getAuthErrorMessage(error));
+                }
+            });
+
+            document.getElementById('settings-forgot-password-btn')?.addEventListener('click', async () => {
+                const email = document.getElementById('settings-link-email').value.trim();
+                if (!email) { alert('Enter your email address first.'); return; }
+                try {
+                    await sendPasswordResetEmail(auth, email);
+                    alert('Password reset email sent. Check your inbox.');
+                } catch (error) {
+                    alert(getAuthErrorMessage(error));
+                }
+            });
+        }
+
+        async function startNewBudget() {
+            const newBudgetRef = push(ref(db, 'budgets'));
+            const newBudgetId = newBudgetRef.key;
+            const budgetData = createNewBudget();
+            await set(newBudgetRef, budgetData);
+            if (currentUser) {
+                await linkBudgetToUser(newBudgetId, budgetData.accountName);
+            }
+            connectToBudget(newBudgetId);
+        }
+
+        async function joinBudget() {
+            const budgetId = selectors.joinBudgetIdInput.value.trim();
+            if (!budgetId) { alert('Please enter a budget ID.'); return; }
+            const budgetRef = ref(db, `budgets/${budgetId}`);
+            const snapshot = await get(budgetRef);
+            if (snapshot.exists()) {
+                if (currentUser) {
+                    await linkBudgetToUser(budgetId, snapshot.val()?.accountName || 'Shared Budget');
+                }
+                connectToBudget(budgetId);
+            } else {
+                alert('Budget ID not found. Please check the ID and try again.');
+            }
+        }
         
         function connectToBudget(budgetId) {
             currentBudgetId = budgetId;
@@ -2151,6 +2402,73 @@
 
         selectors.createNewBudgetBtn.addEventListener('click', startNewBudget);
         selectors.joinBudgetBtn.addEventListener('click', joinBudget);
+
+        document.querySelectorAll('.auth-tab').forEach(btn => {
+            btn.addEventListener('click', () => showAuthTab(btn.dataset.authTab));
+        });
+        selectors.showResetPasswordBtn.addEventListener('click', () => showAuthTab('reset'));
+        selectors.backToSignInBtn.addEventListener('click', () => showAuthTab('sign-in'));
+
+        selectors.signInBtn.addEventListener('click', async () => {
+            const email = selectors.signInEmail.value.trim();
+            const password = selectors.signInPassword.value;
+            if (!email || !password) { setAuthError('Please enter your email and password.'); return; }
+            try {
+                setAuthError('');
+                await signInWithEmailAndPassword(auth, email, password);
+                await showBudgetPanel();
+            } catch (error) {
+                setAuthError(getAuthErrorMessage(error));
+            }
+        });
+
+        selectors.signUpBtn.addEventListener('click', async () => {
+            const email = selectors.signUpEmail.value.trim();
+            const password = selectors.signUpPassword.value;
+            const confirm = selectors.signUpPasswordConfirm.value;
+            if (!email || !password) { setAuthError('Please fill in all fields.'); return; }
+            if (password.length < 6) { setAuthError('Password must be at least 6 characters.'); return; }
+            if (password !== confirm) { setAuthError('Passwords do not match.'); return; }
+            try {
+                setAuthError('');
+                await createUserWithEmailAndPassword(auth, email, password);
+                await showBudgetPanel();
+            } catch (error) {
+                setAuthError(getAuthErrorMessage(error));
+            }
+        });
+
+        selectors.sendResetBtn.addEventListener('click', async () => {
+            const email = selectors.resetEmail.value.trim();
+            if (!email) { setAuthError('Please enter your email address.'); return; }
+            try {
+                setAuthError('');
+                await sendPasswordResetEmail(auth, email);
+                alert('Password reset email sent. Check your inbox.');
+                showAuthTab('sign-in');
+            } catch (error) {
+                setAuthError(getAuthErrorMessage(error));
+            }
+        });
+
+        selectors.signOutBtn.addEventListener('click', async () => {
+            await signOut(auth);
+            showAuthPanel();
+        });
+
+        selectors.userBudgetsList.addEventListener('click', async (e) => {
+            const item = e.target.closest('.user-budget-item');
+            if (!item) return;
+            const budgetId = item.dataset.budgetId;
+            const snapshot = await get(ref(db, `budgets/${budgetId}`));
+            if (snapshot.exists()) {
+                connectToBudget(budgetId);
+            } else {
+                alert('That budget could not be found. It may have been deleted.');
+                await renderUserBudgetList();
+            }
+        });
+
         selectors.noSpendTodayBtn.addEventListener('click', logNoSpendDay); 
 
         selectors.showTutorialBtn.addEventListener('click', () => {
@@ -2413,6 +2731,7 @@
             selectors.sharableIdDisplay.value = currentBudgetId; 
             selectors.editAccountNameInput.value = state.accountName || ''; 
             selectors.toggleChallenges.checked = state.challengesEnabled !== false;
+            renderAccountSection();
             selectors.accountsModal.style.display = 'flex'; 
         });
         selectors.toggleChallenges.addEventListener('change', (e) => { 
@@ -2657,8 +2976,21 @@
             else if (button.classList.contains('cancel-edit-expense-btn')) { set(ref(db, `budgets/${currentBudgetId}/budgetedItems/${categoryKey}/expenses/${expenseKey}/isEditing`), false); }
         });
         
-        const lastBudgetId = localStorage.getItem('lastBudgetId');
-        if (lastBudgetId) { connectToBudget(lastBudgetId); }
+        onAuthStateChanged(auth, async (user) => {
+            currentUser = user;
+            const lastBudgetId = localStorage.getItem('lastBudgetId');
+            if (lastBudgetId) {
+                connectToBudget(lastBudgetId);
+                return;
+            }
+            selectors.onboardingModal.style.display = 'flex';
+            selectors.appContent.style.display = 'none';
+            if (user) {
+                await showBudgetPanel();
+            } else {
+                showAuthPanel();
+            }
+        });
     </script>
 
     <script>
