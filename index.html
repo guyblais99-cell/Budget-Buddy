@@ -144,6 +144,8 @@
         .auth-form { display: flex; flex-direction: column; gap: 10px; }
         .auth-form input { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px; }
         .auth-error { color: var(--expense-color); font-size: 0.9em; margin: 8px 0 0; min-height: 1.2em; }
+        .auth-success { color: var(--income-color); font-size: 0.9em; margin: 8px 0 0; min-height: 1.2em; font-weight: 600; }
+        .auth-form button:disabled { opacity: 0.65; cursor: wait; }
         .auth-link-btn { background: none; border: none; color: var(--accent-color); cursor: pointer; padding: 0; text-align: left; font-size: 0.9em; text-decoration: underline; }
         .user-budget-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px; margin-bottom: 8px; background: #fafafa; cursor: pointer; text-align: left; width: 100%; color: var(--text-color); font-weight: normal; }
         .user-budget-item:hover { background: #eaf2fa; border-color: var(--accent-color); }
@@ -613,6 +615,7 @@
                 </div>
 
                 <p id="auth-error" class="auth-error"></p>
+                <p id="auth-success" class="auth-success"></p>
             </div>
 
             <div id="budget-panel" style="display: none;">
@@ -832,7 +835,7 @@
             signInEmail: document.getElementById('sign-in-email'), signInPassword: document.getElementById('sign-in-password'), signInBtn: document.getElementById('sign-in-btn'),
             signUpEmail: document.getElementById('sign-up-email'), signUpPassword: document.getElementById('sign-up-password'), signUpPasswordConfirm: document.getElementById('sign-up-password-confirm'), signUpBtn: document.getElementById('sign-up-btn'),
             resetEmail: document.getElementById('reset-email'), sendResetBtn: document.getElementById('send-reset-btn'), showResetPasswordBtn: document.getElementById('show-reset-password-btn'), backToSignInBtn: document.getElementById('back-to-sign-in-btn'),
-            authSignInPanel: document.getElementById('auth-sign-in-panel'), authSignUpPanel: document.getElementById('auth-sign-up-panel'), authResetPanel: document.getElementById('auth-reset-panel'), authError: document.getElementById('auth-error'), signOutBtn: document.getElementById('sign-out-btn'),
+            authSignInPanel: document.getElementById('auth-sign-in-panel'), authSignUpPanel: document.getElementById('auth-sign-up-panel'), authResetPanel: document.getElementById('auth-reset-panel'), authError: document.getElementById('auth-error'), authSuccess: document.getElementById('auth-success'), signOutBtn: document.getElementById('sign-out-btn'),
             accountSection: document.getElementById('account-section'),
             totalToBudget: document.getElementById('total-to-budget'), allocatedInBudgets: document.getElementById('allocated-in-budgets'), allocatedToSavings: document.getElementById('allocated-to-savings'), remainingToAllocate: document.getElementById('remaining-to-allocate'), 
             allocationProgressBar: document.getElementById('allocation-progress-bar'),
@@ -994,12 +997,47 @@
 
         function setAuthError(message) {
             if (selectors.authError) selectors.authError.textContent = message || '';
+            if (selectors.authSuccess) selectors.authSuccess.textContent = '';
+        }
+
+        function setAuthSuccess(message) {
+            if (selectors.authSuccess) selectors.authSuccess.textContent = message || '';
+            if (selectors.authError) selectors.authError.textContent = '';
+        }
+
+        async function requestPasswordReset(email, triggerBtn) {
+            const trimmedEmail = email.trim();
+            if (!trimmedEmail) {
+                setAuthError('Please enter your email address.');
+                return false;
+            }
+            const originalText = triggerBtn?.textContent || 'Send Reset Link';
+            if (triggerBtn) {
+                triggerBtn.disabled = true;
+                triggerBtn.textContent = 'Sending...';
+            }
+            setAuthError('');
+            setAuthSuccess('');
+            try {
+                await sendPasswordResetEmail(auth, trimmedEmail);
+                setAuthSuccess('Reset link sent! Check your email inbox.');
+                return true;
+            } catch (error) {
+                setAuthError(getAuthErrorMessage(error));
+                return false;
+            } finally {
+                if (triggerBtn) {
+                    triggerBtn.disabled = false;
+                    triggerBtn.textContent = originalText;
+                }
+            }
         }
 
         function showAuthPanel() {
             selectors.authPanel.style.display = 'block';
             selectors.budgetPanel.style.display = 'none';
             setAuthError('');
+            setAuthSuccess('');
         }
 
         function showAuthTab(tabName) {
@@ -1010,6 +1048,7 @@
                 btn.classList.toggle('active', btn.dataset.authTab === tabName);
             });
             setAuthError('');
+            setAuthSuccess('');
         }
 
         async function linkBudgetToUser(budgetId, budgetName) {
@@ -1138,12 +1177,19 @@
 
             document.getElementById('settings-forgot-password-btn')?.addEventListener('click', async () => {
                 const email = document.getElementById('settings-link-email').value.trim();
+                const btn = document.getElementById('settings-forgot-password-btn');
                 if (!email) { alert('Enter your email address first.'); return; }
+                const originalText = btn.textContent;
+                btn.disabled = true;
+                btn.textContent = 'Sending...';
                 try {
                     await sendPasswordResetEmail(auth, email);
-                    alert('Password reset email sent. Check your inbox.');
+                    btn.textContent = 'Email sent ✓';
+                    setTimeout(() => { btn.textContent = originalText; btn.disabled = false; }, 3000);
                 } catch (error) {
                     alert(getAuthErrorMessage(error));
+                    btn.textContent = originalText;
+                    btn.disabled = false;
                 }
             });
         }
@@ -2414,7 +2460,12 @@
         document.querySelectorAll('.auth-tab').forEach(btn => {
             btn.addEventListener('click', () => showAuthTab(btn.dataset.authTab));
         });
-        selectors.showResetPasswordBtn.addEventListener('click', () => showAuthTab('reset'));
+        selectors.showResetPasswordBtn.addEventListener('click', () => {
+            if (selectors.signInEmail.value.trim()) {
+                selectors.resetEmail.value = selectors.signInEmail.value.trim();
+            }
+            showAuthTab('reset');
+        });
         selectors.backToSignInBtn.addEventListener('click', () => showAuthTab('sign-in'));
 
         selectors.signInBtn.addEventListener('click', async () => {
@@ -2447,15 +2498,9 @@
         });
 
         selectors.sendResetBtn.addEventListener('click', async () => {
-            const email = selectors.resetEmail.value.trim();
-            if (!email) { setAuthError('Please enter your email address.'); return; }
-            try {
-                setAuthError('');
-                await sendPasswordResetEmail(auth, email);
-                alert('Password reset email sent. Check your inbox.');
-                showAuthTab('sign-in');
-            } catch (error) {
-                setAuthError(getAuthErrorMessage(error));
+            const sent = await requestPasswordReset(selectors.resetEmail.value, selectors.sendResetBtn);
+            if (sent) {
+                setTimeout(() => showAuthTab('sign-in'), 2500);
             }
         });
 
